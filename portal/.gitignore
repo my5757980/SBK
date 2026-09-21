@@ -1,0 +1,64 @@
+# ---------------------------------------------------------------------------
+# Secrets — never commit these
+# ---------------------------------------------------------------------------
+.env
+.env.local
+session_cookies.json
+
+# ---------------------------------------------------------------------------
+# Runtime output (logs, sync state, captured pages)
+# ---------------------------------------------------------------------------
+*.log
+*.out
+sync_log.txt
+fetch_log.txt
+api_calls.txt
+
+# Captured pages / scraped payloads kept only for debugging
+*.html
+!templates/*.html
+extracted_cars.json
+car_urls.json
+collected_car_urls.json
+
+# Screenshots taken while testing
+*.png
+*.jpg
+*.jpeg
+!assets/images/*
+# The exception above names a folder that does not exist - the images live in
+# assets/img - so the logo and the favicon were never in the repository at all.
+# A fresh clone would have come up with no brand mark anywhere on the site.
+!assets/img/*
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# ---------------------------------------------------------------------------
+# Local-only experiments and superseded scripts
+# ---------------------------------------------------------------------------
+_archive/
+
+# ---------------------------------------------------------------------------
+# Editors / OS
+# ---------------------------------------------------------------------------
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini
+*.swp
+*~
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# Backups produced while editing
+# ---------------------------------------------------------------------------
+*.bak
+*.bak_*
+*.old_backup

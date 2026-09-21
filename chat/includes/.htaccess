@@ -1,0 +1,12 @@
+# Nothing in here is a page.
+#
+# config.php and lib.php produce no output when they are opened directly, so
+# this is not fixing a leak - it is making sure that stays true after somebody
+# adds a file to the folder without thinking about it.
+<IfModule mod_authz_core.c>
+  Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+  Order allow,deny
+  Deny from all
+</IfModule>

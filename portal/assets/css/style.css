@@ -1,0 +1,3094 @@
+/* ==========================================================================
+   SBK Auction — design system
+   Ink / paper / vermilion. Editorial, dense where it counts, generous
+   where it matters. Deliberately its own look, not a clone of the feed site.
+   ========================================================================== */
+
+/* ---------- toasts -------------------------------------------------------
+   Messages arrive at the top right and leave on their own. They used to be
+   coloured bands printed wherever the markup happened to sit - sometimes
+   below the fold, so the answer to "did that work?" was off screen.
+
+   Above the sticky header, and clear of it: a message that has to be scrolled
+   to is the problem this replaces. */
+.sbk-toasts{
+  position:fixed;top:74px;right:18px;z-index:10000;
+  display:flex;flex-direction:column;gap:9px;
+  width:min(380px,calc(100vw - 36px));pointer-events:none;
+}
+.sbk-toast{
+  pointer-events:auto;
+  display:flex;align-items:flex-start;gap:10px;
+  padding:12px 12px 12px 13px;border-radius:8px;
+  background:#fff;border:1px solid var(--line);
+  border-left:4px solid var(--pb-grey);
+  box-shadow:0 8px 26px -8px rgba(13,17,23,.32),0 2px 6px rgba(13,17,23,.08);
+  font-size:13.5px;line-height:1.45;color:var(--tx);
+  animation:sbk-toast-in .22s cubic-bezier(.2,.9,.3,1);
+}
+.sbk-toast.is-ok{border-left-color:var(--ok)}
+.sbk-toast.is-err{border-left-color:var(--pb-red)}
+.sbk-toast-i{
+  flex:0 0 20px;height:20px;border-radius:50%;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:#fff;
+}
+.sbk-toast.is-ok .sbk-toast-i{background:var(--ok)}
+.sbk-toast.is-err .sbk-toast-i{background:var(--pb-red)}
+.sbk-toast-t{flex:1;min-width:0;overflow-wrap:anywhere}
+.sbk-toast-x{
+  flex:0 0 auto;border:0;background:none;cursor:pointer;
+  color:var(--tx-3);font-size:19px;line-height:1;padding:0 2px;
+}
+.sbk-toast-x:hover{color:var(--tx)}
+.sbk-toast.is-gone{animation:sbk-toast-out .2s ease-in forwards}
+@keyframes sbk-toast-in{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
+@keyframes sbk-toast-out{to{opacity:0;transform:translateX(16px)}}
+@media (max-width:600px){
+  .sbk-toasts{top:64px;right:10px;left:10px;width:auto}
+}
+
+/* the terms box, when a bid was tried without it */
+.bid-tc.is-wrong{
+  border-radius:4px;padding:3px 5px;margin:-3px -5px;
+  background:rgba(198,32,38,.09);
+  box-shadow:0 0 0 1px rgba(198,32,38,.35);
+}
+
+/* ---------- loading spinner ----------------------------------------------
+   A ring turning in the middle of the window while the next page loads. Above
+   everything, including the sticky header, because it is the one thing that
+   has to be seen whatever is on screen.
+
+   The page behind it is veiled rather than hidden: enough to say it is on its
+   way out, not so much that the reader loses their place. */
+.sbk-spin{
+  position:fixed;inset:0;z-index:9999;
+  display:none;align-items:center;justify-content:center;
+  background:rgba(248,249,250,.72);
+  -webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);
+}
+.sbk-spin.is-on{display:flex;animation:sbk-fade .18s ease-out}
+@keyframes sbk-fade{from{opacity:0}to{opacity:1}}
+
+/* One arc lit on a faint ring. A full circle spinning reads as a wheel and
+   gives no sense of turning; the gap is what makes the motion visible. */
+.sbk-spin-i{
+  width:44px;height:44px;border-radius:50%;
+  border:4px solid rgba(198,32,38,.16);
+  border-top-color:var(--pb-red);
+  animation:sbk-turn .7s linear infinite;
+}
+@keyframes sbk-turn{to{transform:rotate(360deg)}}
+
+@media (prefers-reduced-motion:reduce){
+  .sbk-spin.is-on{animation:none}
+  .sbk-spin-i{animation-duration:1.6s}
+}
+
+:root{
+  /* surfaces */
+  --ink:#0d1117;
+  --ink-2:#161c26;
+  --ink-3:#212a37;
+  --paper:#f6f5f2;
+  --card:#ffffff;
+  --line:#e3e1dc;
+  --line-2:#f0efec;
+
+  /* text */
+  --tx:#151a21;
+  --tx-2:#5c6672;
+  --tx-3:#8b949e;
+  --tx-inv:#f6f5f2;
+
+  /* brand */
+  --accent:#c8442f;         /* vermilion */
+  --accent-dk:#a5341f;
+  --accent-soft:#fdf0ec;
+
+  /* state */
+  --ok:#1f7a4d;
+  --ok-soft:#e8f5ee;
+  --warn:#b3651a;
+  --dead:#7a828c;
+
+  --radius:10px;
+  --radius-sm:6px;
+  --shadow-lift:0 2px 4px rgba(13,17,23,.08), 0 16px 40px -16px rgba(13,17,23,.28);
+
+  --font:"Inter","Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+  --mono:"SF Mono",ui-monospace,"Cascadia Mono","Consolas",monospace;
+}
+
+*{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0;min-height:100vh;display:flex;flex-direction:column;
+  background:var(--paper);
+  color:var(--tx);
+  font-family:var(--font);
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+img{max-width:100%;display:block;}
+a{color:inherit;text-decoration:none;}
+h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.02em;line-height:1.2;}
+
+.container{width:100%;max-width:1360px;margin:0 auto;padding:0 24px;}
+
+/* ---------- top bar ---------------------------------------------------- */
+.topbar{
+  background:var(--ink);
+  color:var(--tx-inv);
+  position:sticky;top:0;z-index:60;
+  border-bottom:1px solid rgba(255,255,255,.07);
+}
+.topbar .container{display:flex;align-items:center;gap:24px;height:62px;}
+.brand{display:flex;align-items:center;gap:12px;}
+/* No card behind the mark. It was given one on the assumption that artwork with
+   a navy ship needed a light ground - but the lockup carries "GLOBAL AUTO
+   TRADING" in white, so it was drawn for a dark ground all along, and the white
+   card was hiding half of it. On the near-black bar the red reads, the white
+   words read, and the ship keeps its own white outlines.
+   Height is set and width left to follow, so the lockup can never be squashed. */
+.brand img{height:34px;width:auto;display:block;}
+.brand-sub{
+  font-size:10.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--tx-3);
+  padding-left:12px;border-left:1px solid rgba(255,255,255,.14);
+}
+.topnav{display:flex;align-items:center;gap:6px;}
+.topnav a{
+  padding:8px 14px;border-radius:var(--radius-sm);
+  font-size:13.5px;font-weight:550;color:#c9d1d9;
+  transition:background .15s,color .15s;
+}
+.topnav a:hover{background:rgba(255,255,255,.08);color:#fff;}
+.topnav .nav-user{font-size:13px;color:var(--tx-3);padding:8px 6px;}
+.topnav .nav-cta{background:var(--accent);color:#fff;}
+.topnav .nav-cta:hover{background:var(--accent-dk);color:#fff;}
+
+/* ---------- Japan's clock and the language picker ----------------------- */
+/* These push the navigation right, so the auto margin moves here. */
+.topbar-tools{
+  margin-left:auto;display:flex;align-items:center;gap:14px;flex:0 0 auto;
+}
+.jst-clock{
+  display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap;
+  font-size:12.5px;color:#c9d1d9;
+  padding:5px 11px;border-radius:var(--radius-sm);
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);
+}
+.jst-clock b{
+  font-size:10px;letter-spacing:.13em;color:var(--tx-3);font-weight:700;
+}
+/* Fixed width so the header does not twitch every second as the digits change */
+.jst-clock .jst-t{font-family:var(--mono);font-variant-numeric:tabular-nums;}
+
+.lang-pick{
+  appearance:none;-webkit-appearance:none;
+  height:32px;padding:0 26px 0 11px;cursor:pointer;
+  font-family:inherit;font-size:13px;color:#c9d1d9;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.14);border-radius:var(--radius-sm);
+  background-image:linear-gradient(45deg,transparent 50%,#9aa4ae 50%),
+                   linear-gradient(135deg,#9aa4ae 50%,transparent 50%);
+  background-position:calc(100% - 15px) 14px,calc(100% - 10px) 14px;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;
+}
+.lang-pick:hover{background-color:rgba(255,255,255,.11);color:#fff}
+.lang-pick option{background:var(--ink);color:#e6edf3}
+
+/* The translator's own furniture. It ships a grey bar across the top of the
+   page and a banner frame that pushes the whole document down forty pixels,
+   leaving the sticky header hanging in mid-air. The widget still does the
+   translating; only its chrome is out of the way. */
+#google_translate_element{display:none !important}
+.goog-te-banner-frame,.skiptranslate{display:none !important}
+body{top:0 !important}
+.goog-te-gadget-icon{display:none !important}
+/* it marks every translated phrase with a yellow wash and a tooltip */
+.goog-text-highlight{background:none !important;box-shadow:none !important}
+
+@media (max-width:1100px){
+  .jst-clock{display:none}
+}
+
+/* ---------- masthead --------------------------------------------------- */
+.masthead{
+  background:
+    radial-gradient(1100px 380px at 78% -30%, rgba(200,68,47,.20), transparent 60%),
+    linear-gradient(180deg, var(--ink-2), var(--ink));
+  color:var(--tx-inv);
+  padding:44px 0 40px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.masthead h1{font-size:34px;font-weight:700;letter-spacing:-.03em;margin-bottom:8px;}
+.masthead h1 em{font-style:normal;color:var(--accent);}
+.masthead p{margin:0;color:#9aa4b0;font-size:15px;max-width:62ch;}
+.mast-stats{display:flex;flex-wrap:wrap;gap:34px;margin-top:26px;}
+.mast-stat .n{
+  font-size:23px;font-weight:700;font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em;color:#fff;
+}
+.mast-stat .l{
+  font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--tx-3);margin-top:2px;
+}
+
+/* ---------- filter bar ------------------------------------------------- */
+.filterbar{
+  background:var(--card);border-bottom:1px solid var(--line);
+  position:sticky;top:62px;z-index:50;
+}
+.filterbar .container{padding-top:14px;padding-bottom:14px;}
+.filter-grid{display:grid;gap:10px;grid-template-columns:repeat(6,minmax(0,1fr));}
+.field{display:flex;flex-direction:column;gap:5px;}
+.field label{
+  font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:600;
+}
+.input,.select{
+  width:100%;height:38px;padding:0 11px;
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  background:#fff;color:var(--tx);font-family:inherit;font-size:14px;
+  transition:border-color .15s, box-shadow .15s;
+}
+.select{
+  appearance:none;
+  background-image:linear-gradient(45deg,transparent 50%,var(--tx-3) 50%),linear-gradient(135deg,var(--tx-3) 50%,transparent 50%);
+  background-position:calc(100% - 16px) 16px, calc(100% - 11px) 16px;
+  background-size:5px 5px,5px 5px;background-repeat:no-repeat;padding-right:30px;
+}
+.input:focus,.select:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(200,68,47,.12);
+}
+.filter-actions{display:flex;gap:8px;align-items:flex-end;}
+
+/* ---------- buttons ---------------------------------------------------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  height:38px;padding:0 16px;border:1px solid transparent;
+  border-radius:var(--radius-sm);cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:600;
+  transition:background .15s,border-color .15s,color .15s,transform .06s;
+}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:var(--accent-dk);}
+.btn-secondary{background:#fff;color:var(--tx);border-color:var(--line);}
+.btn-secondary:hover{border-color:var(--tx-3);}
+.btn-ghost{background:transparent;color:var(--tx-2);}
+.btn-ghost:hover{color:var(--tx);background:var(--line-2);}
+.btn-dark{background:var(--ink);color:#fff;}
+.btn-dark:hover{background:var(--ink-3);}
+.btn-lg{height:46px;padding:0 22px;font-size:15px;}
+.btn-full{width:100%;}
+
+/* ---------- results strip ---------------------------------------------- */
+.resultbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:18px 0 4px;}
+.resultbar .count{font-size:14px;color:var(--tx-2);}
+.resultbar .count strong{
+  color:var(--tx);font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;
+}
+.live-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:3px 10px;border-radius:100px;
+  background:var(--ok-soft);color:var(--ok);
+  font-size:10.5px;font-weight:750;letter-spacing:.13em;text-transform:uppercase;
+  transition:background .25s,color .25s;
+}
+.live-badge::before{
+  content:"";width:6px;height:6px;border-radius:50%;
+  background:var(--ok);animation:pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+.live-badge.live-pulse{background:var(--ok);color:#fff;}
+.live-badge.live-pulse::before{background:#fff;}
+.sortbar{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.sortbar span{font-size:12.5px;color:var(--tx-3);}
+
+/* ---------- car grid --------------------------------------------------- */
+.cars-grid{
+  display:grid;gap:18px;padding:14px 0 34px;
+  grid-template-columns:repeat(auto-fill,minmax(272px,1fr));
+}
+.car-card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden;
+  display:flex;flex-direction:column;
+  transition:box-shadow .18s, transform .18s, border-color .18s;
+}
+.car-card:hover{box-shadow:var(--shadow-lift);transform:translateY(-2px);border-color:#d5d2cb;}
+.car-photo{position:relative;aspect-ratio:4/3;background:var(--line-2);overflow:hidden;}
+.car-photo img{width:100%;height:100%;object-fit:cover;transition:transform .4s ease;}
+.car-card:hover .car-photo img{transform:scale(1.035);}
+.car-photo .noimg{
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  background:repeating-linear-gradient(45deg,#eceae6,#eceae6 10px,#f3f1ee 10px,#f3f1ee 20px);
+  color:var(--tx-3);font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+}
+.chip{
+  position:absolute;top:10px;
+  padding:4px 9px;border-radius:100px;
+  font-size:10.5px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;
+}
+.chip-status{left:10px;}
+.chip-status.is-live{background:rgba(31,122,77,.94);color:#fff;}
+.chip-status.is-sold{background:rgba(200,68,47,.94);color:#fff;}
+.chip-status.is-unsold{background:rgba(179,101,26,.94);color:#fff;}
+.chip-status.is-gone{background:rgba(122,130,140,.94);color:#fff;}
+.chip-rating{right:10px;background:rgba(13,17,23,.86);color:#fff;font-variant-numeric:tabular-nums;}
+
+.car-body{padding:13px 14px 15px;display:flex;flex-direction:column;flex:1;}
+.car-title{
+  font-size:15px;font-weight:650;letter-spacing:-.015em;line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;
+}
+.car-grade{
+  font-size:12px;color:var(--tx-3);margin-top:2px;min-height:18px;
+  display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;
+}
+.car-meta{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;}
+.tag{
+  padding:3px 8px;border-radius:var(--radius-sm);
+  background:var(--line-2);color:var(--tx-2);
+  font-size:11.5px;font-weight:600;font-variant-numeric:tabular-nums;
+}
+.car-origin{
+  margin-top:10px;padding-top:10px;border-top:1px solid var(--line-2);
+  display:flex;justify-content:space-between;gap:10px;
+  font-size:11.5px;color:var(--tx-3);
+}
+.car-origin b{color:var(--tx-2);font-weight:600;}
+.car-foot{margin-top:12px;display:flex;align-items:flex-end;justify-content:space-between;gap:10px;}
+.price{
+  font-size:19px;font-weight:750;letter-spacing:-.025em;
+  font-variant-numeric:tabular-nums;color:var(--tx);
+}
+.price small{
+  display:block;font-size:10.5px;font-weight:600;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--tx-3);margin-bottom:1px;
+}
+.price.is-none{color:var(--tx-3);font-size:15px;}
+.car-foot .btn{height:34px;padding:0 13px;font-size:13px;}
+
+/* ---------- pagination ------------------------------------------------- */
+.pagination{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:8px 0 40px;}
+.pagination .btn{height:34px;padding:0 12px;font-size:13px;}
+.pagination .btn-active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.page-gap{padding:0 4px;color:var(--tx-3);}
+.page-info{margin-left:10px;font-size:12.5px;color:var(--tx-3);font-variant-numeric:tabular-nums;}
+
+.empty{
+  text-align:center;padding:70px 20px;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--radius);margin:20px 0 40px;
+}
+.empty h2{font-size:19px;margin-bottom:6px;}
+.empty p{color:var(--tx-2);margin:0 0 18px;}
+
+/* ---------- detail page ------------------------------------------------ */
+.crumbs{padding:16px 0;font-size:13px;color:var(--tx-3);}
+.crumbs a:hover{color:var(--accent);}
+.crumbs b{color:var(--tx);font-weight:600;}
+
+.detail{display:grid;grid-template-columns:1.35fr 1fr;gap:30px;padding-bottom:44px;}
+.gallery{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+.gallery .stage{aspect-ratio:4/3;background:var(--line-2);}
+.gallery .stage img{width:100%;height:100%;object-fit:cover;}
+.gallery .stage .noimg{
+  width:100%;height:100%;display:flex;align-items:center;justify-content:center;
+  color:var(--tx-3);font-size:12px;letter-spacing:.16em;text-transform:uppercase;
+  background:repeating-linear-gradient(45deg,#eceae6,#eceae6 12px,#f3f1ee 12px,#f3f1ee 24px);
+}
+.thumbs{display:flex;gap:8px;padding:10px;overflow-x:auto;}
+.thumbs img{
+  width:88px;height:66px;object-fit:cover;flex:0 0 auto;
+  border:2px solid transparent;border-radius:var(--radius-sm);cursor:pointer;
+  transition:border-color .15s,opacity .15s;opacity:.72;
+}
+.thumbs img:hover{opacity:1;}
+.thumbs img.active{border-color:var(--accent);opacity:1;}
+
+.detail-side{display:flex;flex-direction:column;gap:18px;}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:20px;}
+.panel h3{
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--tx-3);margin-bottom:14px;font-weight:700;
+}
+.detail-head h1{font-size:25px;line-height:1.2;}
+.detail-head .grade{color:var(--tx-2);font-size:14px;margin-top:5px;}
+.detail-price{
+  display:flex;align-items:flex-end;justify-content:space-between;gap:14px;
+  margin-top:16px;padding-top:16px;border-top:1px solid var(--line-2);
+}
+.detail-price .price{font-size:29px;}
+
+.spec-table{width:100%;border-collapse:collapse;}
+.spec-table tr{border-bottom:1px solid var(--line-2);}
+.spec-table tr:last-child{border-bottom:0;}
+.spec-table th{text-align:left;padding:9px 0;font-size:12.5px;font-weight:550;color:var(--tx-3);width:44%;}
+.spec-table td{
+  text-align:right;padding:9px 0;font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;
+}
+.spec-table td.mono{font-family:var(--mono);font-size:12.5px;}
+
+.stack{display:flex;flex-direction:column;gap:9px;}
+.hint{font-size:13px;color:var(--tx-2);margin:0;}
+.hint a{color:var(--accent);font-weight:600;}
+
+.form-textarea{
+  width:100%;min-height:104px;padding:11px;resize:vertical;
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font-family:inherit;font-size:14px;line-height:1.5;background:#fff;
+}
+.form-textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(200,68,47,.12);}
+
+.alert{padding:11px 13px;border-radius:var(--radius-sm);font-size:13.5px;margin-bottom:12px;}
+.alert-success{background:var(--ok-soft);color:var(--ok);}
+.alert-error{background:var(--accent-soft);color:var(--accent-dk);}
+/* "No bids on current date" is the day reporting itself - neither good news
+   nor bad - and it must STAY on the screen. Deliberately NOT .alert: site.js
+   lifts every .alert into a toast and removes it from the page, which turned
+   this calm line into a red error that floated away after a moment. */
+.day-note{
+  padding:11px 14px;margin-bottom:12px;border-radius:var(--radius-sm);
+  background:var(--line-2);color:var(--ink-3);border-left:3px solid var(--dead);
+  font-size:13.5px;font-weight:600;
+}
+/* The date box sits in the toolbar beside the status chips it decides. */
+.bid-day{display:inline-flex;align-items:center;gap:8px;margin-right:2px;}
+.bid-day label{font-size:12px;font-weight:650;color:var(--dead);letter-spacing:.04em;text-transform:uppercase;}
+.bid-day .input{width:auto;min-width:150px;}
+
+.section-head{display:flex;align-items:baseline;gap:12px;padding:8px 0 4px;margin-top:8px;}
+.section-head h2{font-size:19px;}
+.section-head .rule{flex:1;height:1px;background:var(--line);}
+
+/* ---------- auth / simple pages ---------------------------------------- */
+.slim{max-width:440px;margin:52px auto;}
+.slim .panel{padding:28px;}
+.slim h1{font-size:23px;margin-bottom:6px;}
+.slim .sub{color:var(--tx-2);font-size:14px;margin:0 0 20px;}
+.form-row{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.form-row label{font-size:12.5px;font-weight:600;color:var(--tx-2);}
+
+/* ---------- footer ----------------------------------------------------- */
+.footer{background:var(--ink);color:#8b949e;margin-top:auto;border-top:1px solid rgba(255,255,255,.07);}
+.footer .container{
+  display:flex;align-items:center;justify-content:space-between;gap:20px;
+  flex-wrap:wrap;padding-top:26px;padding-bottom:26px;
+}
+/* same as the header: the mark sits straight on the dark ground */
+.footer .fbrand img{height:30px;width:auto;display:block;}
+.footer p{margin:0;font-size:12.5px;}
+
+/* ---------- responsive ------------------------------------------------- */
+@media (max-width:1080px){
+  .filter-grid{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .detail{grid-template-columns:1fr;}
+}
+@media (max-width:720px){
+  .container{padding:0 16px;}
+  .topbar .container{height:56px;gap:12px;}
+  .brand-sub{display:none;}
+  .topnav a{padding:7px 10px;font-size:13px;}
+  .masthead{padding:30px 0 28px;}
+  .masthead h1{font-size:26px;}
+  .mast-stats{gap:22px;}
+  .filterbar{position:static;}
+  .filter-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .cars-grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;}
+  .sortbar{margin-left:0;width:100%;}
+}
+
+/* ==========================================================================
+   Compatibility layer
+   Maps the markup used by the older pages (dashboard, orders, admin) onto
+   the design system above so the whole portal reads as one product.
+   ========================================================================== */
+
+/* --- old navbar --------------------------------------------------------- */
+.navbar{
+  background:var(--ink);color:var(--tx-inv);
+  position:sticky;top:0;z-index:60;border-bottom:1px solid rgba(255,255,255,.07);
+}
+.navbar .container{display:flex;align-items:center;gap:20px;height:62px;}
+.navbar-brand h1{font-size:19px;font-weight:800;letter-spacing:.12em;color:#fff;margin:0;}
+.navbar-menu{margin-left:auto;display:flex;align-items:center;gap:6px;}
+.nav-link{
+  padding:8px 14px;border-radius:var(--radius-sm);
+  font-size:13.5px;font-weight:550;color:#c9d1d9;
+  transition:background .15s,color .15s;
+}
+.nav-link:hover{background:rgba(255,255,255,.08);color:#fff;}
+.nav-text{font-size:13px;color:var(--tx-3);padding:8px 4px;}
+.btn-logout,.btn-admin{background:rgba(255,255,255,.10);color:#fff;}
+.btn-logout:hover,.btn-admin:hover{background:var(--accent);}
+
+/* --- old hero / section wrappers ---------------------------------------- */
+.hero{
+  background:linear-gradient(180deg,var(--ink-2),var(--ink));
+  color:var(--tx-inv);padding:40px 0;text-align:left;
+}
+.hero h1{font-size:30px;margin-bottom:6px;}
+.hero p{margin:0;color:#9aa4b0;}
+.breadcrumb-section{padding:16px 0;font-size:13px;color:var(--tx-3);}
+.breadcrumb-section a:hover{color:var(--accent);}
+.results-info{padding:16px 0 0;color:var(--tx-2);font-size:14px;}
+.listings,.related-cars,.car-details,.dashboard{padding:8px 0 40px;}
+
+/* --- old search form ---------------------------------------------------- */
+.search-section{background:var(--card);border-bottom:1px solid var(--line);padding:16px 0;}
+.search-row{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;}
+.search-input{
+  flex:1 1 170px;height:38px;padding:0 11px;
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  font-family:inherit;font-size:14px;background:#fff;
+}
+.search-input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(200,68,47,.12);}
+
+/* --- old auth pages ----------------------------------------------------- */
+.auth-section{padding:52px 0;}
+.auth-container{max-width:440px;margin:0 auto;padding:0 16px;}
+.auth-box{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:28px;
+}
+.auth-box h1{font-size:23px;margin-bottom:6px;}
+.auth-subtitle{color:var(--tx-2);font-size:14px;margin:0 0 20px;}
+.auth-footer{margin:16px 0 0;text-align:center;font-size:13px;color:var(--tx-2);}
+.auth-footer a{color:var(--accent);font-weight:600;}
+
+/* --- old form controls -------------------------------------------------- */
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
+.form-group label{font-size:12.5px;font-weight:600;color:var(--tx-2);}
+.form-input,.form-select{
+  width:100%;height:38px;padding:0 11px;
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  background:#fff;font-family:inherit;font-size:14px;color:var(--tx);
+}
+.form-input:focus,.form-select:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(200,68,47,.12);
+}
+.btn-large{height:46px;padding:0 22px;font-size:15px;}
+
+/* --- dashboards & tables ------------------------------------------------ */
+.dashboard-section{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:22px;margin-bottom:20px;
+}
+.dashboard-section h2{font-size:18px;margin-bottom:14px;}
+.table-responsive{overflow-x:auto;}
+.dashboard-table{width:100%;border-collapse:collapse;font-size:13.5px;}
+.dashboard-table th{
+  text-align:left;padding:10px 12px;background:var(--line-2);
+  font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:700;white-space:nowrap;
+}
+.dashboard-table td{padding:11px 12px;border-bottom:1px solid var(--line-2);}
+.dashboard-table tr:last-child td{border-bottom:0;}
+.dashboard-table tr:hover td{background:#fbfaf8;}
+
+/* --- status pills ------------------------------------------------------- */
+.status-badge{
+  display:inline-block;padding:3px 10px;border-radius:100px;
+  font-size:10.5px;font-weight:750;letter-spacing:.08em;text-transform:uppercase;
+  background:var(--line-2);color:var(--tx-2);
+}
+.status-pending{background:#fdf1e4;color:var(--warn);}
+.status-open{background:#fdf1e4;color:var(--warn);}
+.status-confirmed,.status-completed,.status-answered,.status-closed{
+  background:var(--ok-soft);color:var(--ok);
+}
+.status-cancelled,.status-rejected{background:var(--accent-soft);color:var(--accent-dk);}
+
+/* --- legacy card / detail markup ---------------------------------------- */
+.car-image{position:relative;aspect-ratio:4/3;background:var(--line-2);overflow:hidden;}
+.car-image img{width:100%;height:100%;object-fit:cover;}
+.car-info{padding:13px 14px 15px;}
+.car-specs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+.car-specs .spec{
+  padding:3px 8px;border-radius:var(--radius-sm);background:var(--line-2);
+  color:var(--tx-2);font-size:11.5px;font-weight:600;
+}
+.car-price{font-size:19px;font-weight:750;letter-spacing:-.02em;margin:6px 0 10px;}
+.details-row{display:grid;grid-template-columns:1.35fr 1fr;gap:30px;padding-bottom:40px;}
+.details-col-image .main-image{
+  aspect-ratio:4/3;background:var(--line-2);border-radius:var(--radius);overflow:hidden;
+  border:1px solid var(--line);
+}
+.details-col-image .main-image img{width:100%;height:100%;object-fit:cover;}
+.thumbnail-gallery{display:flex;gap:8px;margin-top:10px;overflow-x:auto;}
+.thumbnail{
+  width:88px;height:66px;object-fit:cover;flex:0 0 auto;cursor:pointer;
+  border:2px solid transparent;border-radius:var(--radius-sm);opacity:.72;
+}
+.thumbnail.active,.thumbnail:hover{opacity:1;border-color:var(--accent);}
+.price-section{display:flex;align-items:center;gap:12px;margin:14px 0;}
+.price-section .price{font-size:27px;}
+.specs-list{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:6px 16px;margin:16px 0;
+}
+.spec-item{
+  display:flex;justify-content:space-between;gap:12px;
+  padding:9px 0;border-bottom:1px solid var(--line-2);
+}
+.spec-item:last-child{border-bottom:0;}
+.spec-label{font-size:12.5px;color:var(--tx-3);}
+.spec-value{font-size:13.5px;font-weight:600;font-variant-numeric:tabular-nums;}
+.action-buttons{display:flex;flex-direction:column;gap:9px;margin:16px 0;}
+.inquiry-section{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:20px;margin-top:16px;
+}
+.inquiry-section h3{
+  font-size:11px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--tx-3);margin-bottom:12px;font-weight:700;
+}
+.inquiry-form{display:flex;flex-direction:column;gap:9px;}
+.login-prompt{font-size:13px;color:var(--tx-2);margin:0;}
+.login-prompt a{color:var(--accent);font-weight:600;}
+.no-results{
+  text-align:center;padding:60px 20px;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--radius);
+}
+
+@media (max-width:1080px){ .details-row{grid-template-columns:1fr;} }
+
+/* ==========================================================================
+   Account dashboard
+   ========================================================================== */
+.acct-head{
+  background:linear-gradient(180deg,var(--ink-2),var(--ink));
+  color:var(--tx-inv);padding:30px 0;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.acct-head .container{display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
+.acct-id{display:flex;align-items:center;gap:16px;}
+.avatar{
+  width:52px;height:52px;flex:0 0 auto;border-radius:50%;
+  background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;font-weight:750;letter-spacing:.04em;
+}
+.acct-head h1{font-size:24px;color:#fff;}
+.acct-head p{margin:3px 0 0;color:#9aa4b0;font-size:13.5px;}
+.acct-actions{margin-left:auto;display:flex;gap:8px;}
+
+.stat-row{
+  display:grid;gap:14px;padding:22px 0 4px;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+}
+.stat-tile{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:16px 18px;
+}
+.stat-tile.accent{border-color:#f0cfc7;background:linear-gradient(180deg,#fffaf9,#fff);}
+.stat-tile .k{
+  font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:700;
+}
+.stat-tile .v{
+  font-size:26px;font-weight:750;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;margin:5px 0 2px;
+}
+.stat-tile.accent .v{color:var(--accent);}
+.stat-tile .s{font-size:12px;color:var(--tx-3);}
+
+.dashboard-table td.mono{font-family:var(--mono);font-size:12.5px;}
+
+.thread-list{display:flex;flex-direction:column;gap:12px;padding-bottom:8px;}
+.thread{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:18px 20px;
+}
+.thread-top{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.thread-top h3{font-size:15.5px;}
+.thread-top .status-badge{margin-left:auto;}
+.thread-msg{margin:0;font-size:14px;color:var(--tx-2);line-height:1.6;}
+.thread-reply{
+  margin-top:12px;padding:12px 14px;border-radius:var(--radius-sm);
+  background:var(--ok-soft);border-left:3px solid var(--ok);
+}
+.thread-reply .who{
+  font-size:10.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--ok);font-weight:750;
+}
+.thread-reply p{margin:4px 0 0;font-size:14px;color:var(--tx);}
+.thread-meta{
+  margin-top:12px;padding-top:10px;border-top:1px solid var(--line-2);
+  font-size:11.5px;color:var(--tx-3);
+}
+
+@media (max-width:720px){
+  .acct-actions{margin-left:0;width:100%;}
+  .acct-actions .btn{flex:1;}
+}
+
+/* ---------- order flow -------------------------------------------------- */
+.order-car{display:flex;gap:14px;align-items:flex-start;}
+.order-car-photo{
+  width:150px;flex:0 0 auto;aspect-ratio:4/3;overflow:hidden;
+  border-radius:var(--radius-sm);background:var(--line-2);border:1px solid var(--line);
+}
+.order-car-photo img{width:100%;height:100%;object-fit:cover;}
+.order-total{
+  display:flex;align-items:baseline;justify-content:space-between;
+  margin-top:14px;padding-top:14px;border-top:2px solid var(--ink);
+}
+.order-total span{font-size:12.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx-3);font-weight:700;}
+.order-total strong{font-size:23px;font-weight:750;letter-spacing:-.02em;font-variant-numeric:tabular-nums;}
+.agree{display:flex;gap:9px;align-items:flex-start;font-size:13px;color:var(--tx-2);line-height:1.5;cursor:pointer;}
+.agree input{margin-top:2px;accent-color:var(--accent);width:15px;height:15px;flex:0 0 auto;}
+.ok-mark{
+  width:54px;height:54px;margin:0 auto 14px;border-radius:50%;
+  background:var(--ok-soft);color:var(--ok);
+  display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;
+}
+.order-ref{
+  background:var(--line-2);border-radius:var(--radius-sm);padding:12px;
+}
+.order-ref span{
+  display:block;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:700;margin-bottom:3px;
+}
+.order-ref strong{font-family:var(--mono);font-size:16px;letter-spacing:.02em;}
+@media (max-width:720px){ .order-car-photo{width:110px;} }
+
+/* ==========================================================================
+   Admin
+   ========================================================================== */
+.admin-shell{
+  display:grid;grid-template-columns:216px 1fr;gap:0;
+  flex:1;align-items:stretch;
+}
+/* Held in view while the page scrolls past it.
+   It was as tall as whatever page it stood beside, so on the Overview - a page
+   several screens long - Sign out ended up at the very bottom of the document.
+   Somebody wanting to leave had to scroll to the end of the day's charts to
+   find the door. */
+.admin-nav{
+  background:var(--ink-2);border-right:1px solid rgba(255,255,255,.06);
+  padding:22px 14px;
+  position:sticky;top:62px;
+  height:calc(100vh - 62px);
+  overflow-y:auto;
+}
+.admin-nav-label{
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:#6b7480;font-weight:700;padding:0 10px 8px;
+}
+.admin-nav{display:flex;flex-direction:column;align-self:start;}
+.admin-nav-label:not(:first-child){margin-top:20px;}
+.admin-nav a{
+  display:flex;align-items:center;gap:11px;
+  padding:9px 12px;margin-bottom:2px;border-radius:var(--radius-sm);
+  color:#c9d1d9;font-size:13.5px;font-weight:550;
+  transition:background .15s,color .15s;
+}
+.admin-nav a:hover{background:rgba(255,255,255,.07);color:#fff;}
+.admin-nav a.on{background:var(--accent);color:#fff;}
+
+/* The icon inherits the link's colour, so the open section's mark turns with
+   its label instead of sitting there a different shade. */
+.nav-i{width:18px;height:18px;flex:0 0 auto;opacity:.85;}
+.admin-nav a.on .nav-i,
+.admin-nav a:hover .nav-i{opacity:1;}
+.nav-t{flex:1;min-width:0;}
+
+/* What is waiting, beside the section it is waiting in. */
+.nav-b{
+  flex:0 0 auto;min-width:20px;padding:1px 6px;border-radius:99px;
+  background:var(--accent);color:#fff;
+  font-size:11px;font-weight:800;text-align:center;
+  font-variant-numeric:tabular-nums;
+}
+.admin-nav a.on .nav-b{background:rgba(255,255,255,.25);}
+
+/* Sign out sits at the foot, away from the work, with a rule above it - it is
+   not one more place to go. */
+.admin-nav-foot{
+  margin-top:auto;padding-top:14px;
+  border-top:1px solid rgba(255,255,255,.08);
+}
+.admin-nav-foot a{color:#8b949e;}
+.admin-main{padding:26px 30px 44px;min-width:0;}
+.admin-main > h1{font-size:24px;margin-bottom:4px;}
+.admin-main > .lede{color:var(--tx-2);font-size:14px;margin:0 0 20px;}
+
+.kpi-row{
+  display:grid;gap:14px;margin-bottom:24px;
+  grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+}
+.kpi{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);padding:16px 18px;
+}
+.kpi .k{
+  font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:700;
+}
+.kpi .v{
+  font-size:26px;font-weight:750;letter-spacing:-.03em;
+  font-variant-numeric:tabular-nums;margin-top:5px;
+}
+/* one line saying what the number actually counts, so figures that look
+   similar are never mistaken for each other */
+.kpi .s{font-size:11.5px;color:var(--tx-3);margin-top:3px;line-height:1.35;}
+.kpi.accent{border-color:#f0cfc7;background:linear-gradient(180deg,#fffaf9,#fff);}
+.kpi.accent .v{color:var(--accent);}
+
+.admin-card{
+  background:var(--card);border:1px solid var(--line);
+  border-radius:var(--radius);overflow:hidden;margin-bottom:20px;
+}
+.admin-card-head{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 18px;border-bottom:1px solid var(--line);
+}
+.admin-card-head h2{font-size:15px;}
+.admin-card-head .spacer{flex:1;}
+.admin-card-body{padding:18px;}
+
+.admin-toolbar{
+  display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px;
+}
+.admin-toolbar .input,.admin-toolbar .select{width:auto;min-width:180px;}
+
+@media (max-width:900px){
+  .admin-shell{grid-template-columns:1fr;}
+  /* Stacked on a phone, so the nav is a strip at the top and pinning it would
+     spend half the screen on a menu nobody is reading. */
+  .admin-nav{position:static;height:auto;overflow:visible;}
+  .admin-nav{
+    min-height:0;display:flex;flex-direction:row;align-items:center;
+    gap:6px;overflow-x:auto;
+    padding:12px;border-right:0;border-bottom:1px solid rgba(255,255,255,.06);
+  }
+  /* A strip runs across, so the column's headings and its foot rule have
+     nothing to divide - the sections read as one row of places to go. */
+  .admin-nav .admin-nav-label{display:none;}
+  .admin-nav-foot{margin:0;padding:0;border-top:0;}
+  .admin-nav a{white-space:nowrap;margin-bottom:0;}
+  .admin-nav-label{display:none;}
+  .admin-nav a{white-space:nowrap;margin-bottom:0;}
+  .admin-main{padding:20px 16px 40px;}
+}
+
+/* discreet staff entrance in the footer */
+.staff-link{
+  margin-left:auto;font-size:12px;color:#6b7480;
+  padding:4px 10px;border:1px solid rgba(255,255,255,.10);border-radius:var(--radius-sm);
+  transition:color .15s,border-color .15s;
+}
+.staff-link:hover{color:#c9d1d9;border-color:rgba(255,255,255,.28);}
+@media (max-width:720px){ .staff-link{margin-left:0;} }
+
+/* ---------- live updates that don't disturb the reader -------------------- */
+.car-card.just-updated{
+  animation: cardTouched 1.4s ease-out;
+}
+@keyframes cardTouched{
+  0%   { box-shadow:0 0 0 2px var(--accent) inset; }
+  100% { box-shadow:0 0 0 0 transparent inset; }
+}
+.live-pill{
+  position:fixed;left:50%;bottom:24px;transform:translate(-50%, 20px);
+  z-index:80;border:0;cursor:pointer;
+  padding:11px 20px;border-radius:100px;
+  background:var(--ink);color:#fff;
+  font-family:inherit;font-size:13.5px;font-weight:650;
+  box-shadow:0 8px 28px -8px rgba(13,17,23,.5);
+  opacity:0;transition:opacity .2s ease, transform .2s ease;
+}
+.live-pill.on{opacity:1;transform:translate(-50%, 0);}
+.live-pill:hover{background:var(--accent);}
+.live-pill::before{
+  content:"";display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:#5ee08f;margin-right:8px;vertical-align:middle;
+}
+
+/* ==========================================================================
+   Pick-a-vehicle journey: welcome (manufacturers) -> models -> auction list
+   ========================================================================== */
+.welcome-head{
+  background:
+    radial-gradient(900px 300px at 82% -40%, rgba(200,68,47,.18), transparent 60%),
+    linear-gradient(180deg,var(--ink-2),var(--ink));
+  color:var(--tx-inv);padding:34px 0 30px;
+  border-bottom:1px solid rgba(255,255,255,.06);
+}
+.welcome-head h1{font-size:29px;letter-spacing:-.03em;}
+.welcome-head h1 em{font-style:normal;color:var(--accent);}
+.welcome-head p{margin:8px 0 0;color:#9aa4b0;font-size:14.5px;}
+
+.pick-step{display:flex;align-items:center;gap:12px;padding:24px 0 12px;}
+.pick-step h2{font-size:17px;}
+.pick-step .rule{flex:1;height:1px;background:var(--line);}
+.step-num{
+  width:24px;height:24px;flex:0 0 auto;border-radius:50%;
+  background:var(--ink);color:#fff;
+  display:flex;align-items:center;justify-content:center;
+  font-size:12.5px;font-weight:750;
+}
+
+.make-group{margin-bottom:22px;}
+.make-group-label{
+  font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--tx-3);font-weight:700;margin-bottom:9px;
+}
+.make-grid{
+  display:grid;gap:8px;
+  grid-template-columns:repeat(auto-fill,minmax(168px,1fr));
+}
+.make-tile{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:11px 13px;background:var(--card);
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+  transition:border-color .15s,box-shadow .15s,transform .12s;
+}
+.make-tile:hover{
+  border-color:var(--accent);box-shadow:0 6px 18px -10px rgba(13,17,23,.35);
+  transform:translateY(-1px);
+}
+.make-tile .mk{font-size:13.5px;font-weight:600;letter-spacing:-.01em;}
+.make-tile .ct{
+  font-size:11.5px;color:var(--tx-3);font-variant-numeric:tabular-nums;
+  background:var(--line-2);padding:2px 7px;border-radius:100px;
+}
+.make-grid.is-primary .make-tile{border-color:#d9d6cf;background:#fffdfc;}
+.make-grid.is-primary .make-tile .mk{font-weight:700;}
+
+.model-cols{
+  columns:4 210px;column-gap:26px;padding-bottom:8px;
+}
+.model-block{break-inside:avoid;margin-bottom:16px;}
+.model-letter{
+  font-size:14px;font-weight:750;color:var(--accent);
+  padding-bottom:4px;margin-bottom:5px;border-bottom:1px solid var(--line);
+}
+.model-link{
+  display:block;padding:3px 0;font-size:13.5px;color:var(--tx);
+  transition:color .12s;
+}
+.model-link:hover{color:var(--accent);}
+.model-link .ct{color:var(--tx-3);font-size:11.5px;font-variant-numeric:tabular-nums;}
+
+@media (max-width:720px){
+  .welcome-head h1{font-size:23px;}
+  .make-grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));}
+  .model-cols{columns:2 150px;column-gap:16px;}
+}
+
+/* ==========================================================================
+   AUCTION LIST  —  filter panel, column table, photo viewer
+   ========================================================================== */
+
+.crumbs{font-size:13px;color:var(--dead);padding:18px 0 10px;letter-spacing:.01em}
+.crumbs a{color:var(--dead);text-decoration:none;border-bottom:1px solid transparent}
+.crumbs a:hover{color:var(--accent);border-bottom-color:var(--accent)}
+.crumbs b{color:var(--tx)}
+
+/* ------------------------------------------------------------ filter panel */
+.filterpanel{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:16px 18px;margin-bottom:14px;
+}
+.fp-row{
+  display:grid;gap:12px 14px;align-items:end;
+  grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+}
+.fp-row .field label{
+  display:block;font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--dead);margin-bottom:5px;
+}
+.fp-row .field label .bound{
+  float:right;font-weight:500;text-transform:none;letter-spacing:0;
+  color:var(--line);color:#a8a49c;
+}
+.fp-row .input,.fp-row .select{
+  width:100%;padding:8px 10px;font:inherit;font-size:14px;color:var(--tx);
+  background:#fff;border:1px solid var(--line);border-radius:var(--radius-sm);
+}
+.fp-row .input:focus,.fp-row .select:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
+}
+.fp-row .pair{display:flex;gap:6px}
+.fp-actions{display:flex;gap:8px;align-items:flex-end}
+.fp-actions .btn{white-space:nowrap}
+
+/* facets: the lists that narrow as you choose */
+.fp-facets{
+  display:grid;gap:14px;margin-top:16px;padding-top:16px;
+  border-top:1px solid var(--line);
+  grid-template-columns:repeat(auto-fit,minmax(180px,1fr));
+}
+.facet-head{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;
+  color:var(--tx);margin-bottom:7px;
+}
+.facet-list{display:flex;flex-direction:column;gap:1px}
+.facet-item{
+  display:flex;align-items:center;gap:7px;font-size:13px;color:var(--tx);
+  padding:3px 5px;border-radius:4px;cursor:pointer;
+}
+.facet-item:hover{background:var(--paper)}
+.facet-item input{accent-color:var(--accent);margin:0;flex:none}
+.facet-item .fv{
+  flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.facet-item .fn{font-size:11px;color:var(--dead);font-variant-numeric:tabular-nums}
+.facet-item.extra{display:none}
+.facet.is-open .facet-item.extra{display:flex}
+.facet-more{
+  margin-top:5px;background:none;border:none;padding:2px 5px;cursor:pointer;
+  font:inherit;font-size:12px;font-weight:600;color:var(--accent);
+}
+.facet-more:hover{text-decoration:underline}
+
+/* ------------------------------------------------------------- result bar */
+.resultbar{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:4px 2px 12px;
+}
+.resultbar .count{font-size:14px;color:var(--dead)}
+.resultbar .count strong{color:var(--tx);font-size:16px}
+.resultbar .sortbar{
+  margin-left:auto;display:flex;align-items:center;gap:6px;
+  font-size:12px;color:var(--dead);
+}
+.resultbar .pp{
+  text-decoration:none;color:var(--dead);padding:3px 8px;
+  border:1px solid var(--line);border-radius:var(--radius-sm);background:#fff;
+}
+.resultbar .pp.on,.resultbar .pp:hover{
+  color:#fff;background:var(--ink);border-color:var(--ink);
+}
+
+/* --------------------------------------------------------- column table */
+.lot-table-wrap{
+  background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  /* No overflow here on a wide screen, deliberately: a box with overflow-x:auto
+     also gets overflow-y:auto, which makes it the scroll container — and then
+     position:sticky on the column header can never stick to the page. The
+     table fits inside the 1360px container, so the scroller is only needed on
+     narrow screens (see the media query at the end of this block). */
+}
+.lot-table{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+.lot-table thead th{
+  /* Parks under the sticky top bar, which owns 0-63px.
+     Deliberately a LIGHTER surface than .topbar: both used var(--ink), so once
+     the header actually started sticking the two dark bars butted together and
+     read as one over-tall navbar. The lighter shade, the hairline top edge and
+     the drop shadow keep it reading as a table header floating over the rows. */
+  position:sticky;top:63px;z-index:2;
+  background:var(--ink-3);color:var(--tx-inv);text-align:left;vertical-align:top;
+  padding:9px 10px;font-size:11px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.10),
+             0 8px 16px -10px rgba(13,17,23,.55);
+}
+/* keep a row clear of the sticky chrome when the browser scrolls one into view */
+.lot-table tbody tr{scroll-margin-top:120px}
+@media (max-width:1000px){
+  /* narrow screen: the table has to scroll sideways, which costs the sticky
+     header. Fair trade — the columns no longer fit on screen anyway. */
+  .lot-table-wrap{overflow-x:auto}
+  .lot-table thead th{position:static}
+}
+.lot-table thead th .sub{
+  display:block;margin-top:3px;font-size:10px;font-weight:500;
+  color:rgba(246,245,242,.55);text-transform:uppercase;letter-spacing:.05em;
+}
+.col-sort{color:inherit;text-decoration:none;display:inline-block}
+.col-sort:hover{color:#fff;text-decoration:underline}
+.col-sort.is-sorted{color:#fff}
+.col-sort .arr{font-size:9px}
+
+.lot-table tbody tr{border-top:1px solid var(--line)}
+.lot-table tbody tr:nth-child(even){background:#fbfaf8}
+.lot-table tbody tr:hover{background:var(--accent-soft)}
+.lot-table td{padding:8px 10px;vertical-align:top;color:var(--tx)}
+.lot-table .sub2{
+  display:block;margin-top:2px;font-size:11px;color:var(--dead);line-height:1.4;
+}
+.lot-table .sub2.mono{font-family:var(--mono);font-size:11px;color:var(--tx)}
+.lot-table .tm{margin-left:5px;font-size:11px;color:var(--dead)}
+.lot-table .lot-no{
+  font-family:var(--mono);font-weight:700;font-size:14px;
+  color:var(--ink);text-decoration:none;
+}
+.lot-table .lot-no:hover{color:var(--accent)}
+.lot-table .c-price{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums}
+.lot-table .c-price .p-start{font-weight:700;font-size:14px}
+.lot-table .c-price .p-sold{color:var(--ok);font-weight:600;font-size:12px}
+.lot-table .c-go{text-align:right}
+.lot-table .grade-pill{
+  display:inline-block;padding:1px 6px;border-radius:3px;
+  background:var(--paper);border:1px solid var(--line);
+  font-size:10px;font-weight:600;color:var(--tx);margin-right:4px;
+}
+.chip-status.mini{font-size:10px;padding:1px 6px}
+.btn-xs{padding:4px 10px;font-size:12px}
+
+/* thumbnails inside the row */
+.c-photo{width:170px}
+.thumbs-row{display:flex;gap:3px}
+.lot-thumb{
+  width:52px;height:40px;object-fit:cover;border-radius:4px;
+  border:1px solid var(--line);background:var(--paper);cursor:zoom-in;
+  transition:transform .12s ease,border-color .12s ease;
+}
+.lot-thumb:hover{transform:scale(1.06);border-color:var(--accent)}
+.no-thumb{color:var(--dead);font-size:12px}
+
+/* a cell whose value just changed on a live update */
+.just-changed{animation:cellFlash 1.4s ease-out}
+@keyframes cellFlash{
+  0%{background:#fff3b0;box-shadow:0 0 0 3px #fff3b0}
+  100%{background:transparent;box-shadow:none}
+}
+
+/* ------------------------------------------------------------- lightbox */
+.lightbox{
+  position:fixed;inset:0;z-index:90;display:flex;align-items:center;
+  justify-content:center;padding:32px;background:rgba(13,17,23,.86);
+}
+.lightbox[hidden]{display:none}
+.lightbox img{
+  max-width:100%;max-height:100%;border-radius:var(--radius);
+  box-shadow:var(--shadow-lift);background:var(--paper);
+}
+.lb-close{
+  position:absolute;top:14px;right:20px;width:38px;height:38px;
+  background:none;border:none;color:#fff;font-size:32px;line-height:1;
+  cursor:pointer;opacity:.8;
+}
+.lb-close:hover{opacity:1}
+
+@media (max-width:720px){
+  .fp-facets{grid-template-columns:1fr 1fr}
+  .resultbar .sortbar{margin-left:0}
+
+  /* The top bar is one 62px-high flex row. On a phone the brand plus five nav
+     links do not fit, and the overflow made the whole PAGE scroll sideways.
+     Let it wrap onto two lines instead and drop the name, which the dashboard
+     already shows. */
+  .topbar .container{
+    height:auto;flex-wrap:wrap;gap:4px 12px;padding-top:9px;padding-bottom:9px;
+  }
+  .topnav{margin-left:0;flex-wrap:wrap;gap:2px}
+  .topnav a{padding:6px 9px;font-size:13px}
+  .topnav .nav-user{display:none}
+}
+
+/* ------------------------------------------------- detail page action bar */
+.lot-actionbar{
+  display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;
+  padding:6px 0 18px;border-bottom:1px solid var(--line);margin-bottom:20px;
+}
+.lab-title h1{margin:0;font-size:26px;line-height:1.15;letter-spacing:-.02em}
+.lab-meta{display:block;margin-top:5px;font-size:13px;color:var(--dead)}
+.lab-meta b{color:var(--tx);font-family:var(--mono)}
+.lab-actions{margin-left:auto;display:flex;gap:8px}
+
+/* bidding box */
+.bidbox{border-color:var(--accent)}
+.bid-range{
+  margin:0 0 12px;padding:9px 11px;border-radius:var(--radius-sm);
+  background:var(--accent-soft);color:var(--tx);font-size:13.5px;line-height:1.5;
+}
+.bid-range b{font-variant-numeric:tabular-nums}
+.bid-label{
+  display:block;font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--dead);
+}
+.bid-input{display:flex;align-items:stretch}
+.bid-input .cur{
+  display:flex;align-items:center;padding:0 11px;font-weight:700;
+  background:var(--paper);border:1px solid var(--line);border-right:none;
+  border-radius:var(--radius-sm) 0 0 var(--radius-sm);color:var(--tx);
+}
+.bid-input .input{
+  flex:1;padding:10px 12px;font:inherit;font-size:17px;font-weight:600;
+  border:1px solid var(--line);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+}
+.bid-input .input:focus{
+  outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);
+}
+
+/* ---------------------------------------------- admin: bids and enquiries */
+/* Whose bid it is, where the customer's name would be. A bid from inside the
+   panel has no customer behind it, so the name shown is the staff member's and
+   this says why - otherwise it reads as a customer nobody can find. */
+.chip-staff{
+  display:inline-block;margin-left:5px;padding:1px 6px;border-radius:999px;
+  font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;
+  background:#eef2f7;color:#1f4e79;border:1px solid #c3d9f5;vertical-align:1px;
+}
+.bid-del-form{display:inline}
+
+.bid-admin-form{display:flex;gap:6px;align-items:center}
+.bid-admin-form .select{width:130px;height:32px;font-size:13px}
+.bid-admin-form .input{
+  width:120px;height:32px;font-size:13px;padding:0 8px;
+  border:1px solid var(--line);border-radius:var(--radius-sm);
+}
+.bid-admin-form .btn{height:32px;padding:0 11px;font-size:12.5px}
+
+.enq-card{margin-bottom:14px}
+.enq-head{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:11px 16px;border-bottom:1px solid var(--line);background:var(--paper);
+}
+.enq-no{font-weight:700;font-size:13.5px}
+.enq-status{
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;
+  padding:2px 8px;border-radius:99px;background:var(--line);color:var(--tx);
+}
+/* New is the one that wants finding: nobody has read it yet. It gets the
+   filled badge and the others sit back from it. */
+.enq-status.s-new{background:var(--accent);color:#fff}
+.enq-status.s-open{background:var(--accent-soft);color:var(--accent-dk)}
+.enq-status.s-answered{background:var(--ok-soft);color:var(--ok)}
+.enq-when{margin-left:auto;font-size:12.5px;color:var(--dead)}
+.enq-meta{
+  display:grid;gap:8px 22px;margin-bottom:12px;font-size:13.5px;
+  grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+}
+.enq-meta .k,.enq-reply .k{
+  display:block;font-size:11px;font-weight:600;text-transform:uppercase;
+  letter-spacing:.07em;color:var(--dead);margin-bottom:2px;
+}
+.enq-meta .mono{margin-left:6px;font-size:12px;color:var(--dead)}
+.enq-msg{
+  margin:0 0 12px;padding:11px 14px;border-left:3px solid var(--ink);
+  background:var(--paper);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  font-size:14px;line-height:1.6;color:var(--tx);
+}
+.enq-reply{
+  margin:0 0 12px;padding:11px 14px;border-left:3px solid var(--ok);
+  background:var(--ok-soft);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  font-size:14px;line-height:1.6;
+}
+.enq-form-foot{display:flex;gap:8px;align-items:center;margin-top:8px}
+.enq-form-foot .select{width:150px}
+
+/* ------------------------------------------------------- staff & roles */
+.staff-form{display:grid;gap:12px;grid-template-columns:repeat(5,minmax(0,1fr));align-items:end}
+.staff-form .fp-actions{display:flex;align-items:flex-end}
+@media (max-width:1080px){.staff-form{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:620px){.staff-form{grid-template-columns:1fr}}
+/* a permission row is a sentence, not a one-word tag, so let it wrap */
+.admin-main .facet-item{align-items:flex-start}
+.admin-main .facet-item .fv{white-space:normal;line-height:1.4}
+.admin-main .facet-item input[disabled] + .fv{opacity:.55}
+
+/* ============================================================ Pacific Boeki
+   The client's reference portal. Its auction table is the shape buyers in this
+   trade already know: a red header, every column a stacked pair, and the whole
+   row scannable without opening anything. These rules sit after the originals
+   so they win on the same selectors without the earlier ones being unpicked -
+   the older look is still one revert away.
+   ------------------------------------------------------------------------ */
+:root{
+  --pb-red:#c62026;        /* header bars, buttons, the year */
+  --pb-red-dk:#a5171c;
+  --pb-grey:#6b6b6b;       /* the quiet half of every stacked pair */
+  --pb-green:#1a8a45;      /* Available, and the auction grade */
+  --pb-row:#f3f3f3;        /* the banded row */
+}
+
+.lot-table{font-size:13px;min-width:1040px}
+.lot-table thead th{
+  background:var(--pb-red);color:#fff;
+  text-transform:none;letter-spacing:0;font-size:13px;font-weight:700;
+  padding:11px 9px;line-height:1.45;
+  box-shadow:none;border:0;
+}
+.lot-table thead th .sub{
+  color:#fff;text-transform:none;letter-spacing:0;
+  font-size:13px;font-weight:700;margin-top:2px;
+}
+.lot-table thead .col-sort{color:#fff}
+.col-sort .arr{font-size:11px;opacity:.85}
+.col-sort:hover{text-decoration:none;opacity:.85}
+
+.lot-table tbody tr{border-top:0}
+.lot-table tbody tr:nth-child(even){background:var(--pb-row)}
+.lot-table tbody tr:nth-child(odd){background:#fafafa}
+.lot-table tbody tr:hover{background:#eef4fb}
+.lot-table td{padding:12px 9px;vertical-align:middle;line-height:1.5}
+
+/* photo ------------------------------------------------------------------ */
+.lot-table .c-photo{width:348px}
+/* Side by side, not stacked. Three pictures in a column made the row tall and
+   each one letterbox-thin, so a buyer could tell a saloon from a van and not
+   much else. In a row they can be shown at the shape the camera took them in. */
+.lot-shots{display:flex;flex-direction:row;gap:4px;align-items:center}
+.lot-table .lot-thumb{
+  /* Every picture the feed sent, not just the first. A buyer scanning a
+     hundred rows is comparing what the cars look like, and one thumbnail per
+     row makes them open each lot to find out. Clicking one opens it full size
+     where it is - it used to carry them off to the lot page, which is the one
+     thing somebody looking at a picture is not asking for. */
+  width:110px;height:83px;object-fit:cover;display:block;
+  border:1px solid #ccc;background:#fff;cursor:zoom-in;
+}
+.lot-table .lot-thumb:hover{border-color:var(--pb-red)}
+
+/* lot number, wishlist, the A-D photo letters ---------------------------- */
+.lot-table .c-lot{width:120px;text-align:center}
+.lot-table .lot-no{
+  display:inline-block;background:var(--pb-grey);color:#fff;
+  font-family:var(--mono);font-weight:700;font-size:14px;
+  padding:3px 14px;border-radius:3px;text-decoration:none;letter-spacing:.02em;
+}
+.lot-table .lot-no:hover{background:#4f4f4f;color:#fff}
+.lot-table .wish{
+  display:block;margin:6px 0 5px;font-size:11px;color:var(--pb-grey);
+  text-decoration:none;
+}
+.lot-table .wish:hover{color:var(--pb-red);text-decoration:underline}
+.abcd{display:flex;gap:3px;justify-content:center}
+.abcd .ltr{
+  width:19px;height:19px;line-height:17px;text-align:center;
+  border:1px solid var(--pb-red);color:var(--pb-red);
+  font-size:11px;font-weight:700;text-decoration:none;background:#fff;
+}
+.abcd .ltr:hover{background:var(--pb-red);color:#fff}
+.abcd .ltr.is-off{border-color:#d5d5d5;color:#d5d5d5;background:#fff}
+
+/* auction date, the live countdown, the hall ----------------------------- */
+.lot-table .ad{display:block;font-weight:600;color:#333}
+.lot-table .ad .jst{font-style:normal;font-size:11px;color:var(--pb-grey);margin-left:2px}
+.lot-table .left{display:block;font-size:11.5px;color:var(--pb-red);font-weight:700;margin:1px 0}
+.lot-table .left:empty{display:none}
+.lot-table .hall{display:block;font-size:12.5px;color:var(--pb-grey)}
+
+/* the stacked pairs ------------------------------------------------------ */
+.lot-table .mdl{display:block;color:#555;font-weight:600}
+.lot-table .yr{display:block;color:var(--pb-red);font-weight:700}
+.lot-table .chs{display:block;color:#333}
+.lot-table .gr{display:block;font-size:12px;color:var(--pb-grey)}   /* upright: a model grade is a spec, not an aside */
+.lot-table .cc,.lot-table .km{display:block;color:#333}
+.lot-table .km{color:var(--pb-grey)}
+.lot-table .trn{display:block;color:var(--pb-red);font-weight:700}
+.lot-table .col{display:block;color:var(--pb-grey)}
+
+.lot-table .c-grade{
+  text-align:center;color:var(--pb-green);font-weight:700;font-size:14px;width:74px;
+}
+.lot-table .c-price{text-align:right;color:var(--pb-grey);font-weight:600;width:96px}
+.lot-table .c-result{
+  /* Reads with Start Price beside it, so it carries the same weight rather
+     than shouting in green. A lot that has been through the hall still stands
+     apart - it shows the hammer price underneath. */
+  text-align:center;width:96px;font-weight:600;color:var(--pb-grey);
+}
+.lot-table .c-result .sold-at{display:block;font-size:11px;font-weight:600;color:#333}
+.lot-table .no-thumb{color:#bbb}
+
+@media (max-width:1000px){
+  .lot-table-wrap{overflow-x:auto}
+  .lot-table thead th{position:static}
+}
+
+/* ------------------------------------------------------- the search panel
+   Six columns, red headers, everything visible at once. The reference portal
+   puts the whole search on screen rather than behind disclosure, because a
+   buyer filtering an auction day works across all six at once. */
+.pb-title{
+  text-align:center;font-size:31px;font-weight:800;color:#5a5a5a;
+  margin:26px 0 6px;letter-spacing:.01em;
+}
+.pb-title::after{
+  content:"";display:block;width:148px;height:3px;background:var(--pb-red);
+  margin:9px auto 0;
+}
+
+.pb-lotbar{background:#efefef;padding:14px 16px;margin:18px 0 14px}
+.pb-lotbar-in{display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:center}
+.pb-lotbar label{font-size:13.5px;font-weight:700;color:#4a4a4a;letter-spacing:.02em}
+/* Three named boxes on one line, each with its label above it. They were one
+   box with the label beside it, which only had room to name one of the three
+   things it accepted. */
+.pb-find{display:flex;flex-direction:column;gap:5px;flex:1 1 210px;max-width:280px}
+.pb-find label{font-size:12px;font-weight:700;color:#4a4a4a;letter-spacing:.02em}
+.pb-lotbar input[type=text]{
+  width:100%;padding:9px 11px;font-size:13.5px;
+  border:1px solid #c9c9c9;background:#fff;border-radius:3px;
+}
+.pb-lotbar-in .pb-btn,
+.pb-lotbar-in select{align-self:flex-end}
+.pb-hint-2{display:inline-block;margin-top:4px;color:#8a8a8a;font-size:12px}
+.pb-lotbar select{
+  flex:0 1 280px;padding:9px 11px;font-size:13.5px;
+  border:1px solid #c9c9c9;background:#fff;border-radius:3px;
+}
+.pb-hint{text-align:center;font-size:12.5px;color:var(--pb-grey);margin:10px 0 0}
+
+.pb-btn{
+  background:var(--pb-red);color:#fff;border:0;border-radius:3px;
+  padding:9px 26px;font-size:14px;font-weight:600;cursor:pointer;
+  text-decoration:none;display:inline-block;line-height:1.5;
+}
+.pb-btn:hover{background:var(--pb-red-dk);color:#fff}
+.pb-btn-2{background:var(--pb-red)}
+
+.pb-cols{display:grid;grid-template-columns:repeat(6,1fr);gap:9px;align-items:start}
+/* A tick now searches by itself, after a short pause so several ticks make one
+   search. The pause is long enough to look like nothing happened, so the panel
+   dims to say the list is on its way. */
+.pb-cols.is-working{opacity:.55;pointer-events:none;transition:opacity .12s}
+.pb-col{border:1px solid #dcdcdc;background:#fafafa}
+.pb-col-h{
+  background:var(--pb-red);color:#fff;text-align:center;
+  padding:9px 6px;font-size:14px;font-weight:700;
+}
+.pb-col-b{padding:7px 8px}
+.pb-scroll{max-height:290px;overflow-y:auto}
+.pb-col-more{grid-column:span 1}
+.pb-none{font-size:12px;color:var(--pb-grey);margin:6px 2px}
+
+.pb-ck{display:flex;align-items:flex-start;gap:6px;padding:2px 0;font-size:12.5px;cursor:pointer}
+.pb-ck input{margin:3px 0 0;flex:0 0 auto}
+.pb-ck span{color:#3a3a3a;line-height:1.4}
+.pb-ck:hover span{color:var(--pb-red)}
+
+.pb-mk{
+  display:flex;justify-content:space-between;gap:8px;
+  padding:3px 5px;font-size:12.5px;color:#3a3a3a;text-decoration:none;
+}
+.pb-mk i{font-style:normal;color:var(--pb-grey);font-size:11px}
+.pb-mk:hover{background:#e8e8e8;color:var(--pb-red)}
+.pb-mk.is-on{background:#9a9a9a;color:#fff}
+.pb-mk.is-on i{color:rgba(255,255,255,.8)}
+
+.pb-pair{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:7px}
+.pb-pair input,.pb-pair select{
+  width:100%;padding:7px 8px;font-size:12.5px;
+  border:1px solid #c9c9c9;background:#fff;border-radius:3px;min-width:0;
+}
+/* ---------------------------------------------------------- range sliders
+   Year, mileage and engine size were six boxes to type numbers into. They are
+   three sliders now: a buyer looking for "something around 2015, under 100,000"
+   is describing a range, and dragging one is faster than typing four figures
+   and reading which box was which.
+
+   Two <input type=range> stacked on the same track, which is how a two-handled
+   slider is built without a library. The track itself is drawn by .pb-range-t
+   and the coloured part by .pb-range-fill; the inputs are invisible except for
+   their thumbs, and pointer-events are handed back to the thumbs alone so the
+   one underneath is still grabbable. */
+.pb-range{padding:9px 2px 4px}
+.pb-range + .pb-range{border-top:1px solid #e6e6e6}
+/* The heading is a button: it swaps the slider for two boxes. Styled as the
+   heading it looks like, with only the pointer and a hover to say it does
+   something - a filter panel with a button in every row reads as a form to
+   fill in rather than a set of numbers to read. */
+.pb-range-h{
+  display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  width:100%;padding:0;border:0;background:none;text-align:left;
+  font:inherit;cursor:pointer;
+}
+.pb-range-h:hover .pb-range-l{color:var(--pb-red)}
+.pb-range-l{font-size:12px;color:#4a4f55;transition:color .12s}
+.pb-range-l::after{
+  content:"";display:inline-block;margin-left:5px;
+  border:3px solid transparent;border-top-color:#9aa0a6;
+  transform:translateY(2px);
+}
+.pb-range.is-typed .pb-range-l::after{
+  border-top-color:transparent;border-bottom-color:#9aa0a6;transform:translateY(-2px);
+}
+
+/* one mode at a time */
+.pb-range-x{display:none;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
+.pb-range.is-typed .pb-range-t{display:none}
+.pb-range.is-typed .pb-range-x{display:grid}
+.pb-range-x input{
+  width:100%;padding:6px 8px;font-size:12.5px;
+  border:1px solid #c9c9c9;background:#fff;border-radius:3px;min-width:0;
+}
+.pb-range-x input:focus{outline:none;border-color:var(--pb-red)}
+.pb-range-v{font-size:12.5px;font-weight:700;color:#1f2429;font-variant-numeric:tabular-nums}
+.pb-range-t{position:relative;height:26px;margin-top:4px}
+/* the grey rail */
+.pb-range-t::before{
+  content:"";position:absolute;left:0;right:0;top:11px;height:4px;
+  background:#e3e5e7;border-radius:2px;
+}
+/* the part between the two handles */
+.pb-range-fill{
+  position:absolute;top:11px;height:4px;background:#d9636a;border-radius:2px;
+}
+.pb-range-t input[type=range]{
+  position:absolute;left:0;top:0;width:100%;height:26px;margin:0;
+  appearance:none;-webkit-appearance:none;background:none;pointer-events:none;
+}
+.pb-range-t input[type=range]:focus{outline:none}
+.pb-range-t input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;pointer-events:auto;
+  width:15px;height:15px;border-radius:50%;
+  background:var(--pb-red);border:2px solid #fff;cursor:grab;
+  box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+.pb-range-t input[type=range]::-moz-range-thumb{
+  pointer-events:auto;
+  width:15px;height:15px;border-radius:50%;
+  background:var(--pb-red);border:2px solid #fff;cursor:grab;
+  box-shadow:0 1px 3px rgba(0,0,0,.3);
+}
+.pb-range-t input[type=range]:active::-webkit-slider-thumb{cursor:grabbing}
+.pb-range-t input[type=range]::-moz-range-track{background:none;border:0}
+.pb-grades{display:flex;gap:8px;align-items:flex-start;margin-top:9px}
+.pb-grades-l{font-size:12px;color:#3a3a3a;line-height:1.3;flex:0 0 54px}
+/* `1fr` is short for `minmax(auto, 1fr)`, and `auto` in a grid means "never
+   narrower than my contents" - so four columns of a tick box and a label that
+   may not wrap refused to shrink, and on a 414px phone the filter column pushed
+   the page eight pixels sideways. `minmax(0, 1fr)` lets them shrink; the labels
+   are two or three characters and stay perfectly readable. */
+.pb-grades-b{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px 4px;flex:1;min-width:0}
+.pb-ck-in{font-size:11.5px;min-width:0}
+.pb-ck-in span{white-space:nowrap}
+
+.pb-acts{display:flex;gap:10px;justify-content:center;margin:16px 0 6px}
+.pb-hide{display:flex;justify-content:flex-end;margin:6px 0 20px}
+
+@media (max-width:1150px){ .pb-cols{grid-template-columns:repeat(3,1fr)} }
+@media (max-width:720px){
+  .pb-cols{grid-template-columns:repeat(2,1fr)}
+  .pb-title{font-size:23px}
+  .pb-lotbar-in{justify-content:stretch}
+}
+
+/* --------------------------------------------------------- the lot page head
+   Name and price on one line, the letters and paging beneath, then every spec
+   in a grid the eye can sweep. The reference portal puts all of this above the
+   fold so a buyer decides without scrolling. */
+.pb-lot-bar{
+  display:flex;align-items:flex-start;gap:20px;flex-wrap:wrap;
+  padding:16px 0 12px;border-bottom:1px solid #e4e4e4;
+}
+.pb-lot-name h1{
+  margin:0;font-size:26px;font-weight:800;color:#5a5a5a;line-height:1.2;
+}
+.pb-lot-name h1 i{font-style:normal;font-size:17px;color:#8a8a8a;font-weight:700}
+.pb-lot-grade{display:block;margin-top:4px;font-size:13.5px;color:var(--pb-grey)}
+.pb-lot-mid{display:flex;align-items:center;gap:9px;margin:4px auto 0}
+.pb-lnk{color:#3a3a3a;text-decoration:none;font-size:13.5px}
+.pb-lnk:hover{color:var(--pb-red);text-decoration:underline}
+.pb-lot-price{margin-left:auto;font-size:15px;color:#3a3a3a;white-space:nowrap}
+.pb-lot-price b{color:var(--pb-green);font-size:20px;margin:0 3px}
+.pb-cur{
+  display:inline-block;border:1px solid #c9c9c9;border-radius:3px;
+  padding:3px 9px;font-size:12.5px;color:#4a4a4a;background:#fff;
+}
+
+.pb-lot-bar2{
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:11px 0;border-bottom:1px solid #e4e4e4;margin-bottom:16px;
+}
+.pb-abcd{display:flex;align-items:center;gap:6px}
+.pb-abcd .ltr{
+  width:24px;height:24px;line-height:22px;text-align:center;
+  border:1px solid var(--pb-red);color:var(--pb-red);background:#fff;
+  font-size:12px;font-weight:700;text-decoration:none;
+}
+.pb-abcd .ltr:hover{background:var(--pb-red);color:#fff}
+.pb-abcd .ltr.is-off{border-color:#d5d5d5;color:#d5d5d5}
+.pb-btn.is-dead{background:#c9c9c9;cursor:not-allowed;padding:6px 16px;font-size:13px}
+/* Previous / Next as a pair of buttons.
+   They were three underlined links with vertical bars between them, which read
+   as body text rather than as something to press - and the middle one only
+   said where you had come from, which the breadcrumb above already says. */
+.pb-updown{margin-left:auto;display:flex;align-items:center;gap:8px;font-size:13px}
+.pb-step{
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap;
+  padding:7px 15px;border-radius:var(--radius-sm);
+  border:1px solid #d4d8dc;background:#fff;color:#2f3336;
+  font-weight:600;text-decoration:none;
+  transition:background .15s,border-color .15s,color .15s;
+}
+.pb-step:hover{background:var(--pb-red);border-color:var(--pb-red);color:#fff;text-decoration:none}
+/* At the first or last car of the make there is nowhere to step to. Shown
+   rather than removed, so the pair does not jump about between lots. */
+.pb-step.is-off{color:#b8bcc0;background:#f6f7f8;border-color:#e4e6e8;cursor:default}
+.pb-step.is-off:hover{background:#f6f7f8;border-color:#e4e6e8;color:#b8bcc0}
+
+/* the spec grid --------------------------------------------------------- */
+.pb-specs{
+  /* Wraps rather than sitting on a fixed eight-column rail. The reference
+     portal lets each cell take the width its value needs, so a long auction
+     hall name is not squeezed into the same slot as a two-digit year, and the
+     second row simply runs shorter than the first. */
+  display:flex;flex-wrap:wrap;
+  border:1px solid #dcdcdc;border-right:0;border-bottom:0;margin-bottom:20px;
+}
+.pb-spec{
+  flex:1 1 auto;min-width:118px;
+  border-right:1px solid #dcdcdc;border-bottom:1px solid #dcdcdc;
+  padding:8px 12px;background:#fff;
+}
+.pb-spec .k{
+  display:block;font-size:11.5px;color:#9a9a9a;font-style:italic;
+  margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.pb-spec .v{
+  display:block;font-size:13.5px;color:#333;font-weight:600;
+  overflow-wrap:anywhere;
+}
+.pb-spec.is-day .v{font-weight:700}
+.pb-spec.is-time .v .left{
+  display:block;font-style:normal;font-size:12px;color:var(--pb-red);font-weight:700;
+}
+.pb-spec.is-status .v{color:var(--pb-grey)}
+/* What it actually made. The one figure on this page a buyer is looking for
+   when the lot has already been through the hall, so it is not left reading
+   like the rest of the grid. */
+.pb-spec.is-final .v{color:#1a7a3c;font-weight:700}
+
+.pb-spec.is-grade .v{
+  color:var(--pb-red);text-decoration:underline;text-underline-offset:2px;
+}
+
+@media (max-width:620px){
+  .pb-spec{min-width:44%}
+  .pb-lot-name h1{font-size:20px}
+  .pb-lot-price{margin-left:0}
+}
+
+/* ------------------------------------------------- inspection sheet legend
+   The sheet is the only honest account of a car's condition and it is written
+   in a shorthand a buyer outside Japan cannot read, so the key sits on the
+   page with it rather than a click away. */
+.pb-legend{border:1px solid #dcdcdc;background:#fff;margin:26px 0 10px}
+.pb-legend h2{
+  margin:0;background:#efefef;border-bottom:1px solid #dcdcdc;
+  padding:11px 14px;font-size:17px;font-weight:700;color:#4a4a4a;text-align:center;
+}
+.pb-legend-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:2px 30px;padding:16px 20px;
+}
+.pb-mark{display:flex;gap:11px;align-items:baseline;padding:3px 0;font-size:13px}
+.pb-mark .c{
+  flex:0 0 26px;font-weight:800;color:#333;font-family:var(--mono);font-size:12.5px;
+}
+.pb-mark .d{color:#333;line-height:1.45}   /* plain text, not a link: these are definitions, and blue invited clicks that go nowhere */
+
+/* ------------------------------------------------------------- bid panel */
+.bidbox h3,.detail-side .panel > h3{
+  background:#efefef;margin:-16px -16px 14px;padding:10px 14px;
+  border-bottom:1px solid #dcdcdc;
+  font-size:16px;font-weight:700;color:#4a4a4a;text-align:center;
+}
+.bidbox .btn-primary,.detail-side .btn-primary{
+  background:var(--pb-red);border-color:var(--pb-red);
+}
+.bidbox .btn-primary:hover,.detail-side .btn-primary:hover{
+  background:var(--pb-red-dk);border-color:var(--pb-red-dk);
+}
+
+@media (max-width:700px){ .pb-legend-grid{grid-template-columns:1fr;gap:0} }
+
+/* ------------------------------------------------- the lot page, main body
+   Inspection sheet on the left, photographs on the right - the arrangement
+   the reference portal uses, and the right one: the sheet is a document to be
+   read closely, the photographs a set to be flicked through. Treating them
+   alike, as one gallery, buried the sheet behind two clicks. */
+.pb-chassis{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 18px;
+}
+.pb-chassis label{font-size:14.5px;font-weight:700;color:#3a3a3a}
+.pb-chassis input{
+  flex:1 1 260px;max-width:420px;padding:10px 12px;font-size:13.5px;
+  border:1px solid #c9c9c9;border-radius:3px;background:#fff;color:#4a4a4a;
+}
+.pb-chassis .pb-btn.is-dead{padding:10px 20px;font-size:13.5px}
+
+.pb-body{
+  display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start;
+  margin-bottom:26px;
+}
+.pb-sheet{border:1px solid #dcdcdc;background:#fff;padding:8px}
+.pb-sheet img{width:100%;height:auto;display:block}
+.pb-sheet-none{
+  display:flex;flex-direction:column;gap:5px;align-items:center;justify-content:center;
+  min-height:230px;color:var(--pb-grey);text-align:center;
+}
+.pb-sheet-none b{font-size:15px;color:#4a4a4a}
+.pb-sheet-none span{font-size:13px}
+
+.pb-shots{position:relative}
+.pb-stage{border:1px solid #dcdcdc;background:#fff;padding:8px;margin-bottom:10px}
+.pb-stage img{width:100%;height:auto;display:block;cursor:zoom-in}
+.pb-stage .noimg{
+  display:flex;align-items:center;justify-content:center;min-height:230px;color:#bbb;
+}
+.pb-thumbs{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+.pb-thumbs .thumb{
+  width:100%;height:56px;object-fit:cover;display:block;cursor:pointer;
+  border:1px solid #d5d5d5;background:#fff;
+}
+.pb-thumbs .thumb:hover{border-color:var(--pb-red)}
+.pb-thumbs .thumb.active{border-color:var(--pb-red);border-width:2px}
+
+.pb-deadline{
+  margin:12px 0 0;background:#1c1c1c;color:#fff;text-align:center;
+  padding:9px 14px;font-size:12.5px;line-height:1.55;border-radius:2px;
+}
+.pb-deadline b{display:block;font-size:13.5px;margin-bottom:1px}
+
+@media (max-width:860px){
+  .pb-body{grid-template-columns:1fr}
+  .pb-thumbs{grid-template-columns:repeat(5,1fr)}
+}
+
+/* ------------------------------------------------------ above the results
+   Total on the left, page size on the right - the line the reference portal
+   puts between the search and the table. */
+.pb-resultbar{
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  flex-wrap:wrap;margin:4px 0 10px;
+}
+.pb-total{font-size:14px;color:#4a4a4a}
+.pb-total strong{color:var(--pb-red);font-size:16px}
+.pb-perpage{display:flex;align-items:center;gap:8px;font-size:13.5px;color:#4a4a4a}
+.pb-perpage select{
+  padding:6px 9px;font-size:13px;border:1px solid #c9c9c9;
+  border-radius:3px;background:#fff;
+}
+
+/* back to the top ------------------------------------------------------- */
+.pb-top{
+  position:fixed;right:16px;bottom:16px;z-index:20;
+  width:34px;height:34px;border:0;border-radius:3px;cursor:pointer;
+  background:var(--pb-red);color:#fff;font-size:17px;line-height:34px;
+  display:none;padding:0;
+}
+.pb-top:hover{background:var(--pb-red-dk)}
+.pb-top.is-on{display:block}
+
+/* ---------------------------------------------------------------- lightbox */
+/* The page stays visible behind the picture.
+
+   It was nine-tenths black, which is a wall: the reader lost the row they were
+   looking at, the filters they had set and any sense of where the picture came
+   from, and got them back only by closing. A photograph opened over a page is
+   still a photograph on that page.
+
+   A quarter of black is enough to settle the picture forward and keep white
+   edges from bleeding into white ones. Any less and the frame stops reading as
+   a frame; any more and the page behind it is gone again. */
+.pb-lb{
+  position:fixed;inset:0;z-index:60;display:none;
+  background:rgba(0,0,0,.26);align-items:center;justify-content:center;padding:18px;
+  -webkit-backdrop-filter:blur(1.5px);backdrop-filter:blur(1.5px);
+}
+.pb-lb.is-on{display:flex}
+/* One frame, the same every time.
+
+   Letting the picture keep its own pixels - max-width and max-height with auto
+   for both - meant the frame was whatever the file happened to be. A 1024x768
+   photograph opened at 1024x768, which on a wide monitor sits well inside the
+   edges; the auction halls that publish only a small preview opened at 100x75,
+   a stamp in the middle of a black screen. Clicking a picture is a request to
+   see it larger, and it was answering with the same size or smaller.
+
+   So the frame is fixed and the picture is fitted into it. Every zoom, from
+   every hall, opens at one size; contain keeps each one's own shape inside it,
+   so nothing is stretched out of proportion, and a small preview is enlarged to
+   the frame rather than left as a stamp. */
+.pb-lb img{
+  width:min(1180px, calc(100vw - 36px));
+  height:min(860px, calc(100vh - 36px));
+  object-fit:contain;cursor:zoom-out;
+  /* The frame is fixed and the picture is fitted into it, so a photograph whose
+     shape differs from the frame's leaves a band above and below. That band was
+     painted black - a black bar across a page that is otherwise showing
+     through. Left clear, it is the page. */
+  background:transparent;
+  filter:drop-shadow(0 10px 26px rgba(0,0,0,.45));
+}
+/* White-on-white was fine against a black wall. Against the page it needs to
+   carry its own contrast. */
+.pb-lb-x{
+  position:absolute;top:14px;right:18px;width:44px;height:44px;
+  border:0;border-radius:3px;background:rgba(20,24,28,.62);color:#fff;
+  font-size:28px;line-height:1;cursor:pointer;z-index:2;
+  box-shadow:0 2px 10px rgba(0,0,0,.28);
+}
+.pb-lb-x:hover{background:rgba(20,24,28,.82)}
+
+/* Stepping through a set without closing it.
+
+   Both arrows sit clear of the picture, over the page rather than over the car,
+   so nothing in the photograph is covered by a control. They are hidden when
+   the set has only one picture in it - an arrow that does nothing is worse than
+   no arrow. */
+.pb-lb-arw{
+  position:absolute;top:50%;transform:translateY(-50%);
+  width:46px;height:76px;border:0;border-radius:4px;
+  background:rgba(20,24,28,.62);color:#fff;font-size:24px;line-height:1;
+  cursor:pointer;z-index:2;box-shadow:0 2px 10px rgba(0,0,0,.28);
+  display:flex;align-items:center;justify-content:center;
+}
+.pb-lb-arw:hover{background:rgba(20,24,28,.86)}
+.pb-lb-prev{left:10px}
+.pb-lb-next{right:10px}
+.pb-lb-arw[hidden]{display:none}
+
+/* Where you are in the set. Without it the arrows are a corridor with no
+   doors numbered - four photographs and no way to tell the second from the
+   fourth without going round again. */
+.pb-lb-count{
+  position:absolute;bottom:16px;left:50%;transform:translateX(-50%);
+  padding:4px 12px;border-radius:999px;z-index:2;
+  background:rgba(20,24,28,.62);color:#fff;
+  font-size:12.5px;font-weight:650;letter-spacing:.03em;
+}
+.pb-lb-count[hidden]{display:none}
+
+@media (max-width:620px){
+  .pb-lb-arw{width:38px;height:62px;font-size:20px}
+  .pb-lb-prev{left:4px}
+  .pb-lb-next{right:4px}
+}
+
+[data-zoom]{cursor:zoom-in}
+
+/* ------------------------------------------------------------- prod. year
+   One box where there were two, laid out the way jpauc lays its own out: the
+   chassis code, a dash, the number, the maker, and the answer underneath. */
+.pb-vin{
+  border:1px solid var(--line,#e3e5e8);border-radius:10px;
+  padding:12px 14px;margin:0 0 14px;background:var(--bg-2,#f7f8f9);
+}
+.pb-vin-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:9px}
+.pb-vin-head b{font-size:15px;color:var(--tx-1,#22262a)}
+.pb-vin-head span{font-size:12.5px;color:var(--tx-3,#80868c)}
+.pb-vin-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pb-vin-row label{font-size:12.5px;font-weight:650;color:var(--tx-2,#5b6167)}
+.pb-vin-row .pb-vin-l2{margin-left:8px}
+.pb-vin-row input,.pb-vin-row select{
+  height:32px;border:1px solid var(--line,#ccd0d4);border-radius:6px;
+  padding:0 8px;font-size:14px;background:#fff;outline:none;
+}
+.pb-vin-row #vinType{width:110px;text-transform:uppercase}
+.pb-vin-row #vinNo{width:150px;text-transform:uppercase}
+.pb-vin-row #vinMaker{height:34px}
+.pb-vin-dash{color:var(--tx-3,#80868c)}
+.pb-vin-note{margin:9px 0 0;font-size:13px;color:var(--tx-2,#5b6167)}
+.pb-vin-note.is-bad{color:#b3261e}
+.pb-vin-note[hidden]{display:none}
+.pb-vin-tbl{border-collapse:collapse;margin-top:9px;width:100%;max-width:560px;background:#fff}
+.pb-vin-tbl[hidden]{display:none}
+.pb-vin-tbl th,.pb-vin-tbl td{
+  border:1px solid var(--line,#e3e5e8);padding:5px 10px;font-size:13px;text-align:left;
+}
+.pb-vin-tbl th{background:var(--bg-2,#f2f3f5);font-weight:650;color:var(--tx-2,#5b6167)}
+
+/* the rest of the catalogue answer, and the lots we hold of that model */
+.pb-vin-h{margin:14px 0 7px;font-size:13px;font-weight:700;color:var(--tx-1,#22262a)}
+.pb-vin-more[hidden],.pb-vin-stock[hidden]{display:none}
+.pb-vin-grid{
+  display:grid;grid-template-columns:auto 1fr;gap:4px 14px;
+  max-width:560px;background:#fff;border:1px solid var(--line,#e3e5e8);
+  border-radius:8px;padding:9px 12px;
+}
+.pb-vin-k{font-size:12.5px;font-weight:650;color:var(--tx-2,#5b6167)}
+.pb-vin-v{font-size:12.5px;color:var(--tx-1,#22262a)}
+.pb-vin-stock .pb-vin-tbl{max-width:100%}
+.pb-vin-lot{font-weight:700;color:#1558b0;text-decoration:none}
+.pb-vin-lot:hover{text-decoration:underline}
+.pb-vin-all{
+  display:inline-block;margin-top:8px;font-size:12.5px;font-weight:650;
+  color:#1558b0;text-decoration:none;
+}
+.pb-vin-all:hover{text-decoration:underline}
+.pb-vin-none{margin:8px 0 0;font-size:12.5px;color:var(--tx-3,#80868c)}
+.pb-vin-ghost{background:#fff;color:var(--tx-1,#22262a);border:1px solid var(--line,#ccd0d4)}
+.pb-vin-ghost:hover{background:var(--bg-2,#f2f3f5)}
+.pb-vin-lab{
+  margin:11px 0 5px;font-size:11.5px;font-weight:700;letter-spacing:.04em;
+  text-transform:uppercase;color:var(--tx-3,#80868c);
+}
+.pb-vin-chips{display:flex;flex-wrap:wrap;gap:6px}
+.pb-vin-chip{
+  display:inline-block;padding:3px 9px;border-radius:999px;font-size:12px;
+  background:#fff;border:1px solid var(--line,#e3e5e8);color:var(--tx-2,#5b6167);
+  text-decoration:none;white-space:nowrap;
+}
+a.pb-vin-chip:hover{border-color:#1558b0;color:#1558b0}
+.pb-vin-chip.is-key{background:#eef4fd;border-color:#c3d9f5;color:#1558b0;font-weight:650}
+.pb-vin-scroll{overflow-x:auto;margin-top:10px}
+.pb-vin-scroll .pb-vin-tbl{margin-top:0;min-width:760px}
+.pb-vin-tbl tr.is-match td{background:#fffbe9}
+.pb-vin-tbl tr.is-match td:first-child{box-shadow:inset 3px 0 0 #e8b931}
+
+@media (max-width:620px){
+  .pb-vin-grid{grid-template-columns:1fr;gap:2px}
+  .pb-vin-k{margin-top:6px}
+  .pb-vin-stock{overflow-x:auto}
+}
+
+@media (max-width:620px){
+  .pb-vin-row{gap:6px}
+  .pb-vin-row #vinType{width:88px}
+  .pb-vin-row #vinNo{width:112px}
+  .pb-vin-row .pb-vin-l2{margin-left:0}
+}
+
+/* related cars: the whole set of pictures, not one -------------------- */
+.pb-more-shots{display:flex;gap:4px;margin-top:6px}
+.pb-more-shots img{
+  flex:1 1 0;min-width:0;height:44px;object-fit:cover;
+  border:1px solid #d5d5d5;background:#fff;
+}
+.pb-more-shots img:hover{border-color:var(--pb-red)}
+
+/* --------------------------------------------------- the foot of the lot page
+   Three columns, as the client's second screenshot reads: the sheet's key on
+   the left, the bid form in the middle, the cost breakdown on the right. A
+   buyer works across all three at once - what the marks mean, what to bid, and
+   what it lands at - so stacking them made the page a scroll. */
+.pb-bottom{
+  /* Two columns, matching the row above it: the legend sits under the sheet it
+     explains, and the bid form and the cost breakdown under the photographs.
+     Three equal columns put the legend beside the bid form, where it read as a
+     third thing to fill in. */
+  display:grid;grid-template-columns:1.15fr 1fr;gap:22px;align-items:start;
+  margin-bottom:22px;
+}
+.pb-bidrow{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.pb-bidrow .detail-side{gap:14px}
+.pb-bottom .pb-legend{margin:0}
+.pb-bottom .detail-side{display:flex;flex-direction:column;gap:16px}
+.pb-bottom .panel{margin:0}
+
+.pb-fob{padding:0;border:1px solid #dcdcdc;background:#fff}
+.pb-fob h3{
+  background:#efefef;margin:0;padding:11px 14px;border-bottom:1px solid #dcdcdc;
+  font-size:16px;font-weight:700;color:#4a4a4a;text-align:center;
+}
+.pb-fob-t{width:100%;border-collapse:collapse;font-size:12.5px}
+.pb-fob-t td,.pb-fob-t th{
+  border-bottom:1px solid #e4e4e4;padding:7px 10px;color:#3a3a3a;vertical-align:middle;
+}
+.pb-fob-t .h th{background:#efefef;font-weight:700;text-align:left;font-size:13px}
+.pb-fob-t .h2 td{background:#f6f6f6;font-weight:700}
+.pb-fob-t td:last-child{text-align:right;width:96px}
+.pb-fob-t input[type=number]{
+  width:88px;padding:5px 7px;font-size:12.5px;text-align:right;
+  border:1px solid #c9c9c9;border-radius:2px;background:#fff;
+}
+/* The desk's own charges. Shown, because the buyer is entitled to see what
+   makes up the total - but not typed over, because a total built on the
+   buyer's own numbers is one the desk will not honour. Made to read as a
+   figure rather than an empty box, so nobody clicks it expecting to type. */
+.pb-fob-t input[type=number].is-fixed{
+  border:0;background:transparent;padding-right:0;
+  font-weight:700;color:#2f3336;cursor:default;
+}
+.pb-fob-t input[type=number].is-fixed::-webkit-outer-spin-button,
+.pb-fob-t input[type=number].is-fixed::-webkit-inner-spin-button{
+  -webkit-appearance:none;margin:0;
+}
+.pb-fob-t input[type=number].is-fixed{-moz-appearance:textfield}
+.pb-fob-t select{
+  margin-left:6px;padding:4px 6px;font-size:12px;
+  border:1px solid #c9c9c9;border-radius:2px;background:#fff;
+}
+.pb-rd{display:flex;align-items:center;gap:7px;cursor:pointer}
+.pb-fob-t .tot td{background:#efefef;font-weight:800;font-size:14px;border-bottom:0}
+.pb-fob-t .tot td:last-child{color:var(--pb-red)}
+.pb-fob-note{margin:0;padding:9px 12px;font-size:11.5px;color:var(--pb-grey)}
+
+@media (max-width:1100px){ .pb-bottom{grid-template-columns:1fr 1fr} }
+@media (max-width:760px){ .pb-bottom{grid-template-columns:1fr} }
+
+/* the two rows that close the page ------------------------------------- */
+.pb-zip{display:flex;justify-content:center;margin:6px 0 26px}
+.pb-enquiry{
+  display:grid;grid-template-columns:1.15fr 1fr;gap:22px;margin-bottom:30px;
+}
+.pb-enquiry > .panel{grid-column:2;margin:0}
+.pb-enquiry .panel h3{
+  background:#efefef;margin:-16px -16px 14px;padding:11px 14px;
+  border-bottom:1px solid #dcdcdc;
+  font-size:16px;font-weight:700;color:#4a4a4a;text-align:center;
+}
+
+@media (max-width:1100px){
+  .pb-bottom,.pb-enquiry{grid-template-columns:1fr}
+  .pb-enquiry > .panel{grid-column:1}
+}
+@media (max-width:700px){ .pb-bidrow{grid-template-columns:1fr} }
+
+/* ------------------------------------------- retiring the first layout's CSS
+   The two pages the client asked about were laid out once already and those
+   rules are still in the sheet above. Only the ones that clash with the new
+   layout are answered here; the site chrome is left exactly as it was. */
+.pb-bottom > .detail-side,
+.pb-bidrow > .detail-side{
+  display:flex;flex-direction:column;gap:14px;position:static;top:auto;
+}
+.pb-bottom .panel,
+.pb-enquiry .panel{position:static;top:auto}
+.pb-body{padding-bottom:0}
+.pb-resultbar{padding:4px 2px 10px}
+
+/* ------------------------------------------------- the auction table, widths
+   Left to itself the browser gave Chassis No. 275px and Trans./Colour 74px,
+   because chassis codes are long strings and "AT" is not. Column widths ought
+   to follow how much a buyer needs to read, not how many characters happen to
+   sit in the cell. */
+.lot-table{table-layout:fixed}
+/* With a fixed layout every width is read off the first row, so these have to
+   be set on the header cells - the .c-* classes live on the body cells and
+   were quietly doing nothing. */
+.lot-table th:nth-child(1){width:112px}   /* photo                */
+.lot-table th:nth-child(2){width:118px}   /* lot number           */
+.lot-table th:nth-child(3){width:140px}   /* auction date + hall  */
+.lot-table th:nth-child(4){width:150px}   /* model + year         */
+.lot-table th:nth-child(5){width:140px}   /* chassis + grade      */
+.lot-table th:nth-child(6){width:110px}   /* engine + mileage     */
+.lot-table th:nth-child(7){width:96px}    /* trans + colour       */
+.lot-table th:nth-child(8){width:74px}    /* auction grade        */
+.lot-table th:nth-child(9){width:100px}   /* start price          */
+.lot-table th:nth-child(10){width:96px}   /* result               */
+.lot-table td{overflow-wrap:anywhere}
+
+/* the grade checkboxes were a wall of thirty-one boxes; four to a row with the
+   scale running left to right reads as a scale rather than a jumble */
+.pb-grades-b{grid-template-columns:repeat(4,minmax(0,1fr))}
+.pb-grades{align-items:flex-start}
+
+/* ---------------------------------------------------------- two last things
+   The Result heading was picking up the grey meant for its cells - the class
+   sits on the header too, so it read as switched off next to nine white ones.
+
+   The thumbnails were capped at 38px here because three of them were stacked
+   in a column and made every row a third of the screen tall. They sit side by
+   side now, so the row is one picture high whatever that picture's size, and
+   the cap only made them too small to judge a car by. */
+.lot-table thead th.c-result,
+.lot-table thead th.c-price,
+.lot-table thead th.c-grade{color:#fff}
+
+/* ------------------------------------------- the lot page, matched to the
+   reference capture. The client sent a full-page shot of the portal they want
+   this to read like; these are the places ours drifted from it. */
+
+/* The name, Print/PDF and price sit on a tinted band there, not on white */
+.pb-lot-bar{background:#f5f5f5;padding:16px 18px 12px;border-bottom:1px solid #e4e4e4}
+.pb-lot-bar2{padding:11px 18px;background:#fff}
+
+/* Row two of the spec grid was stretching its five cells across the whole
+   width, so Colour got the room Chassis Model had above it and the two rows
+   did not line up. Cells take the width they need and the short row simply
+   ends short - which is what the reference does. */
+.pb-spec{flex:0 1 auto;min-width:0;width:12.5%}
+@media (max-width:1050px){ .pb-spec{width:25%} }
+@media (max-width:620px){ .pb-spec{width:50%} }
+
+/* the bid and enquiry panels wear the same grey caption as the other two */
+.pb-bidrow .panel > h3,
+.pb-enquiry .panel > h3{
+  background:#efefef;margin:-16px -16px 14px;padding:11px 14px;
+  border-bottom:1px solid #dcdcdc;
+  font-size:15px;font-weight:700;color:#4a4a4a;text-align:center;
+  text-transform:none;letter-spacing:0;
+}
+/* The bleed above pulls a caption out to its panel's edges, and it is measured
+   against the sixteen pixels of padding a `.panel` has. `.pb-fob` has none - it
+   is `padding:0` - so the same rule made "Auction FOB Price" thirty-two pixels
+   wider than the panel holding it, and on a 360px phone that was what pushed the
+   whole lot page sideways. Its own heading style already sits flush. */
+.pb-bidrow .pb-fob > h3,
+.pb-bottom .pb-fob > h3{margin:0}
+
+/* ------------------------------------------------------- the Make a Bid panel
+   Kept at full height whether or not this viewer can bid. The reference shows
+   every line - the charges, the estimate, the balance - because a buyer
+   weighing a lot wants to know what a bid would cost before deciding to place
+   one. Collapsing it to a one-line notice answered a different question. */
+.bidbox{padding:16px}
+.bid-why{
+  margin:0 0 12px;padding:8px 10px;border-radius:3px;font-size:12.5px;
+  background:#fdf3f3;border:1px solid #f1d5d5;color:#8a4a4a;line-height:1.5;
+}
+.bid-why.is-ok{background:#f3f8f4;border-color:#cfe3d5;color:#2c6b43}
+/* Bidding is open but the sale may already have run: a word of caution, in
+   amber rather than red, because nothing is refused. */
+.bid-why.bid-warn{background:#fff8ec;border-color:#f1dcb4;color:#8a5a12}
+.bid-form{display:flex;flex-direction:column;gap:9px}
+.bid-row{display:flex;gap:6px;align-items:center}
+.bid-row label{font-size:12.5px;color:#4a4a4a;flex:0 0 66px}
+.bid-row input,.bid-row select{
+  padding:7px 8px;font-size:12.5px;border:1px solid #c9c9c9;border-radius:3px;
+  background:#fff;min-width:0;
+}
+.bid-row input{flex:1 1 auto;text-align:right}
+.bid-row select{flex:0 0 68px}
+.bid-row :disabled{background:#f4f4f4;color:#8a8a8a}
+
+.bid-facts{margin:2px 0;display:grid;grid-template-columns:auto 1fr;gap:5px 10px;font-size:12.5px}
+.bid-facts dt{color:#4a4a4a}
+.bid-facts dd{margin:0;text-align:right;color:#333}
+.bid-facts dd b{color:var(--pb-red)}
+
+.bid-group{
+  width:100%;padding:7px 8px;font-size:12.5px;
+  border:1px solid #c9c9c9;border-radius:3px;background:#f4f4f4;color:#8a8a8a;
+}
+.bid-msg-l{font-size:13px;font-weight:700;color:#4a4a4a}
+.bid-msg-l i{font-style:normal;font-weight:400;color:var(--pb-red)}
+.bidbox textarea{
+  width:100%;padding:8px;font:inherit;font-size:12.5px;
+  border:1px solid #c9c9c9;border-radius:3px;resize:vertical;
+}
+.bid-tc{display:flex;gap:7px;align-items:flex-start;font-size:12.5px;color:#4a4a4a}
+.bid-tc a{color:#3a76c4}
+.bid-balance{margin:0;text-align:center;font-size:13px;color:#4a4a4a}
+.bid-balance span{color:var(--pb-red);font-weight:700}
+.bid-acts{display:flex;gap:9px;justify-content:center;margin-top:2px}
+.bid-acts .pb-btn{padding:8px 20px;font-size:13.5px}
+.bid-acts .pb-btn[disabled]{background:#c9c9c9;cursor:not-allowed}
+
+/* the zip download sits under the right-hand column, as it does in the capture */
+.pb-zip-right{
+  display:grid;grid-template-columns:1.15fr 1fr;margin:6px 0 26px;
+}
+.pb-zip-right > .pb-btn{grid-column:2;justify-self:center}
+@media (max-width:1100px){
+  .pb-zip-right{grid-template-columns:1fr}
+  .pb-zip-right > .pb-btn{grid-column:1}
+}
+
+/* --------------------------------------------- when the source sent no sheet
+   JPAuc's listing gives one photograph and no inspection sheet, so the
+   half-and-half row left an empty box beside a small picture. With nothing to
+   put next to it, the photograph takes the width instead - a lot page with one
+   good large picture reads better than one with a picture and an apology. */
+.pb-body.is-solo{grid-template-columns:1fr;max-width:820px}
+.pb-body.is-solo .pb-stage img{width:100%}
+.pb-body.is-solo .pb-thumbs:empty,
+.pb-body .pb-thumbs:has(> :only-child){display:none}
+
+/* a derived picture that does not exist comes back empty; hide it rather than
+   leave a broken frame in the strip */
+.pb-thumbs img[src]:not([src=""]){background:#fff}
+.pb-thumbs .is-gone,.pb-stage .is-gone{display:none}
+
+/* -------------------------------------------- the table, one column wider
+   Mileage was stacked under engine size; the two are read against each other
+   when comparing lots, so each gets its own column and the widths shift up by
+   one. Eleven columns now: the photo cell also carries the auction sheet
+   beside the two photographs. */
+.lot-table th:nth-child(6){width:88px}    /* engine (cc)          */
+.lot-table th:nth-child(7){width:96px}    /* mileage (km)         */
+.lot-table th:nth-child(8){width:88px}    /* trans + colour       */
+.lot-table th:nth-child(9){width:72px}    /* auction grade        */
+.lot-table th:nth-child(10){width:96px}   /* start price          */
+.lot-table th:nth-child(11){width:92px}   /* result               */
+.lot-table .c-cc,.lot-table .c-km{color:#333}
+.lot-table .c-km{color:var(--pb-grey)}
+
+/* ------------------------------------------------- room for the photographs
+   The pictures sit side by side now, so the photo column has to hold three of
+   them rather than one. The width has to be set here, on the header cell: a
+   fixed layout reads every column width off the first row, and `th:nth-child`
+   also outranks the `.c-photo` class the body cells carry - which is why an
+   earlier attempt at 348px on .c-photo came out 122px wide.
+
+   Every other column gives up a few pixels to pay for it, so the eleven still
+   fit a 1366 screen without the list sliding sideways. */
+.lot-table th:nth-child(1){width:344px}   /* two photos + the sheet */
+.lot-table th:nth-child(2){width:104px}   /* lot number             */
+.lot-table th:nth-child(3){width:118px}   /* auction date + hall    */
+.lot-table th:nth-child(4){width:128px}   /* model + year           */
+.lot-table th:nth-child(5){width:118px}   /* chassis + grade        */
+.lot-table th:nth-child(6){width:76px}    /* engine (cc)            */
+.lot-table th:nth-child(7){width:84px}    /* mileage (km)           */
+.lot-table th:nth-child(8){width:80px}    /* trans + colour         */
+.lot-table th:nth-child(9){width:62px}    /* auction grade          */
+.lot-table th:nth-child(10){width:84px}   /* start price            */
+.lot-table th:nth-child(11){width:80px}   /* result                 */
+.lot-table{min-width:1278px}
+/* No overflow on the wrapper. An overflow of any kind makes it the scroll
+   container that `position:sticky` measures against, so the table's header
+   stopped sticking to the top of the window and slid away under the rows. The
+   narrow-screen rule already turns both the overflow and the sticky header on
+   together further up; here the columns fit, so neither is wanted. */
+
+/* Flex items give up space before they overflow, which shrank the third
+   picture - the inspection sheet - to half the width of the other two. */
+.lot-table .lot-thumb{flex:0 0 106px;width:106px;height:80px}
+
+/* ------------------------------------------------------ past auction prices
+   Twelve columns: the photograph leads, then two price columns instead of one,
+   because what a lot opened at and what it closed at are both worth reading and
+   the gap between them is the useful part.
+
+   The photograph was added on 15 September 2026. It had looked impossible - the
+   source's picture host refuses this server outright - until the test was split
+   properly and showed it refuses DATACENTRE addresses, not unauthenticated ones:
+   a home connection is served with no login, no cookie and no referer. The
+   reader's own browser is such a connection, so it collects the picture itself
+   and nothing has to be fetched, stored or paid for here. */
+.lot-table-stats th:nth-child(1){width:186px}  /* photographs     */
+/* 150px, not 104. A hall is named in full here - "NPS Tomakomai Nyusatsu" is
+   twenty-two characters - and at the old width it broke across three lines and
+   sat on top of the date above it, so the two read as one jumbled thing. */
+.lot-table-stats th:nth-child(2){width:150px}  /* sold on + hall  */
+.lot-table-stats th:nth-child(3){width:78px}   /* lot no          */
+.lot-table-stats th:nth-child(4){width:158px}  /* model + year    */
+.lot-table-stats th:nth-child(5){width:126px}  /* chassis + grade */
+.lot-table-stats th:nth-child(6){width:80px}   /* engine (cc)     */
+.lot-table-stats th:nth-child(7){width:88px}   /* mileage (km)    */
+/* Wide enough to hold a drive written out in full. At 88px "FULLTIME4WD" was one
+   character too long for the column and broke across three lines as
+   "AC / FULLTIME4 / WD", which reads as two faults rather than one word. */
+.lot-table-stats th:nth-child(8){width:112px}  /* trans + drive + colour */
+.lot-table-stats th:nth-child(9){width:62px}   /* condition grade */
+.lot-table-stats th:nth-child(10){width:92px}  /* start price     */
+.lot-table-stats th:nth-child(11){width:104px} /* final price     */
+.lot-table-stats th:nth-child(12){width:84px}  /* result          */
+.lot-table-stats{min-width:1336px}
+
+/* Every picture the source holds for the lot, side by side in a `.lot-shots`
+   strip - the auction list's arrangement, and the thing that makes the lightbox
+   step through THIS car's pictures ("1 / 3") instead of all thirty rows.
+
+   Three per lot: two photographs and the inspection sheet. The host scales them
+   to a height of fifty and nothing else (h=80 and up come back empty), so they
+   arrive at the size they are shown - the photographs 66x50, the sheet 33x50
+   because it is a portrait document. Height is fixed and width left alone: the
+   auction list's `cover` would blow the narrow sheet up and crop a slice out of
+   the middle of it, where here nothing needs cropping at all. */
+.lot-table-stats .c-shot .lot-shots{gap:4px;justify-content:flex-start}
+
+/* Each heading in this table promises two things on two lines - "Sold on /
+   Hall", "Model Name / Year", the engine's size with its power beneath - and the
+   cells have to keep that promise. The `.sub` span was styled for the HEADING
+   only, so in the body it stayed inline and merely wrapped when a column ran
+   short: on a wide screen an engine read "2,700 163 hp" as one line and a
+   gearbox "AC FULLTIME4WD white", with nothing to say which word answered which
+   heading. Second line, quieter, exactly as the heading above it is set. */
+.lot-table-stats tbody .sub{
+  display:block;margin-top:2px;font-size:11.5px;color:var(--tx-3);font-weight:500;
+}
+.lot-table-stats .c-shot .lot-thumb{
+  flex:0 0 auto;height:50px;width:auto;max-width:72px;object-fit:contain;display:block;
+  border-radius:3px;border:1px solid var(--ln);background:var(--bg-2);cursor:zoom-in;
+}
+.lot-table-stats .c-shot .lot-thumb:hover{border-color:var(--pb-red)}
+
+/* The search bar wraps: seven controls is more than a row on a laptop. */
+.pb-stats-form{flex-wrap:wrap;gap:8px;margin-bottom:14px}
+
+/* What the search found, said once, above the table. */
+.pb-stats-sum{
+  display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;
+  padding:10px 14px;margin:0 0 12px;border-radius:10px;
+  background:var(--bg-2,#f5f6f7);color:var(--tx-2,#5b6167);font-size:13px;
+}
+.pb-stats-sum strong{color:var(--tx-1,#22262a);font-size:15px}
+
+/* A price that was paid, and a price that was not.
+   The unsold figure is the highest bid the seller turned down. Showing it in
+   the same weight as a sale price invites a buyer to read it as one, so it is
+   greyed and labelled rather than left to be mistaken. */
+.st-sold{color:#1a7a3c}
+.st-unsold{color:#8b9096;font-weight:600}
+.pill-sold{background:#e7f6ec;color:#1a7a3c;}
+.pill-gone{background:#f0f1f2;color:#7b8085;}
+
+/* ------------------------------------------------ password fields, admin panel
+   Staff passwords were typed in plain sight - readable by anyone standing
+   behind the desk, and kept in the browser's autofill as ordinary text. They
+   are masked, with an eye to reveal on purpose. */
+.pw-wrap{position:relative;display:inline-block;width:100%}
+.pw-wrap .input{width:100%;padding-right:38px}
+.pw-eye{
+  position:absolute;right:4px;top:50%;transform:translateY(-50%);
+  width:30px;height:28px;border:0;background:none;cursor:pointer;
+  font-size:15px;line-height:1;opacity:.5;padding:0;
+}
+.pw-eye:hover{opacity:.9}
+.pw-eye.is-on{opacity:1}
+
+/* a control you are not allowed to use should look it, not just refuse on submit */
+.admin-body select:disabled,.admin-body input:disabled{
+  background:#f1f1f1;color:#8a8a8a;cursor:not-allowed;
+}
+
+/* ==========================================================================
+   RESPONSIVE — nothing may push the page sideways
+   --------------------------------------------------------------------------
+   A page scrolls up and down. If it scrolls left and right as well, something
+   is wider than the window and the layout has failed - so the rules below are
+   about the causes of that, measured at 320, 360, 414, 768, 1024 and 1280.
+   ========================================================================== */
+
+/* Grid and flex children are `min-width:auto`, which means "never narrower
+   than my content". One long chassis code, one long auction-house name, and
+   the child refuses to shrink - pushing its column, its grid and the page with
+   it. This is the single commonest cause and it is why the filter panel was
+   350px wide inside a 320px phone. */
+.pb-col, .pb-col-b, .pb-col-h,
+.pb-mark, .pb-mark .d,
+.pb-legend-grid > *, .pb-bidrow > *, .pb-bottom > *,
+.detail-side, .pb-lot-bar > *, .pb-lotbar-in > *,
+.panel, .card, .stack > *{
+  min-width:0;
+}
+
+/* Long unbroken strings - chassis codes, model grades, email addresses - have
+   nowhere to break unless told they may break anywhere. */
+.pb-mark .d, .pb-col-b, .pb-spec .v, .pb-lot-name h1,
+.sbk-toast-t, .crumbs, .bid-why{
+  overflow-wrap:anywhere;
+}
+
+/* A picture is never wider than what holds it. */
+img{max-width:100%}
+
+/* The lot table is eleven columns of vehicle and will not fit a phone, so it
+   scrolls inside its own box rather than taking the page with it.
+
+   A sticky header cannot survive that: an ancestor with overflow becomes the
+   thing `position:sticky` measures against, and the header slides away under
+   the rows. So the header sticks only where the table already fits and the
+   wrapper does not need to scroll at all. */
+.lot-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.lot-table thead th{position:static}
+@media (min-width:1340px){
+  .lot-table-wrap{overflow-x:visible}
+  .lot-table thead th{position:sticky;top:63px}
+}
+
+/* The header carries a clock, a language picker and the navigation. Below the
+   tablet width they wrap onto a second line rather than squeezing. */
+@media (max-width:820px){
+  .topbar .container{height:auto;flex-wrap:wrap;padding-top:8px;padding-bottom:8px;gap:8px}
+  .topbar-tools{margin-left:auto;order:2}
+  .topnav{order:3;width:100%;justify-content:flex-start;flex-wrap:wrap}
+  .lot-table thead th{top:0}
+}
+
+/* Smallest phones. 320px is the floor - an iPhone SE in portrait - and every
+   fixed width has to give way by then. */
+@media (max-width:400px){
+  .container{padding-left:10px;padding-right:10px}
+  .pb-cols{grid-template-columns:1fr;gap:7px}
+  .jst-clock{display:none}
+  .pb-lot-bar{flex-wrap:wrap;gap:8px}
+  .pb-lot-price{width:100%;text-align:left}
+  .bid-row{flex-wrap:wrap}
+  .pb-range-x{grid-template-columns:1fr}
+  .sbk-toasts{top:auto;bottom:12px;right:8px;left:8px;width:auto}
+}
+
+/* The admin panel, same rules. Its shell is a sidebar and a main column, and
+   the main column holds tables of eight and nine columns - the tables already
+   scroll inside .table-responsive, but the grid children still need telling
+   they may be narrower than their contents. */
+.admin-shell > *, .admin-main > *, .admin-card, .admin-card-body,
+.admin-toolbar > *, .staff-form > *{
+  min-width:0;
+}
+.admin-toolbar{flex-wrap:wrap}
+.admin-toolbar .input,.admin-toolbar .select{max-width:100%}
+.dashboard-table td, .dashboard-table th{overflow-wrap:anywhere}
+
+@media (max-width:520px){
+  .admin-main{padding-left:12px;padding-right:12px}
+  .admin-toolbar .input,.admin-toolbar .select{min-width:0;width:100%}
+}
+
+/* ==========================================================================
+   ROLES & PERMISSIONS (admin)
+   --------------------------------------------------------------------------
+   Two jobs, told apart: a table of roles you can add to, rename and remove,
+   and below it what each one may do. They were one wall of checkboxes before,
+   which answered neither question quickly.
+   ========================================================================== */
+
+.role-add{display:flex;gap:9px;margin-bottom:16px;flex-wrap:wrap}
+.role-add .input{flex:1;min-width:220px;max-width:420px}
+
+.role-table td{vertical-align:middle}
+.role-rename{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.role-rename .input{width:auto;min-width:0;flex:1;max-width:230px;padding:5px 9px;font-size:13px}
+.role-key{
+  font-family:var(--mono);font-size:12px;color:var(--tx-3);
+  background:#f4f5f6;border:1px solid var(--line-2);border-radius:3px;padding:2px 6px;
+}
+.role-lock{
+  margin-left:7px;font-size:11px;letter-spacing:.04em;text-transform:uppercase;
+  color:var(--tx-3);border:1px solid var(--line-2);border-radius:3px;padding:1px 6px;
+}
+.role-perm-cell{white-space:nowrap}
+/* how much of the whole a role holds, at a glance - the number alone makes you
+   do the arithmetic on every row */
+.role-meter{
+  display:inline-block;vertical-align:middle;width:74px;height:6px;margin-right:8px;
+  background:var(--line-2);border-radius:3px;overflow:hidden;
+}
+.role-meter > span{display:block;height:100%;background:var(--pb-red);border-radius:3px}
+.role-meter-n{font-size:12.5px;color:var(--tx-2)}
+.role-acts{white-space:nowrap;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.role-del{display:inline}
+.btn-danger{background:var(--pb-red);color:#fff;border-color:var(--pb-red)}
+.btn-danger:hover{background:var(--pb-red-dk);border-color:var(--pb-red-dk);color:#fff}
+.btn-danger:disabled{background:#e9ebed;color:#a9aeb3;border-color:#e0e2e4;cursor:not-allowed}
+
+/* ---------- what a role may do ---------- */
+.perm-groups{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;
+}
+.perm-group{border:1px solid var(--line-2);border-radius:var(--radius-sm);background:#fcfcfd}
+.perm-group-h{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:9px 11px;border-bottom:1px solid var(--line-2);background:#f6f7f8;
+  border-radius:var(--radius-sm) var(--radius-sm) 0 0;
+}
+.perm-all{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13.5px}
+.perm-count{font-size:12px;color:var(--tx-3);font-variant-numeric:tabular-nums}
+.perm-list{padding:4px 11px 10px}
+.perm-item{
+  display:flex;align-items:flex-start;gap:9px;padding:7px 0;cursor:pointer;
+  border-bottom:1px solid #f0f1f2;
+}
+.perm-item:last-child{border-bottom:0}
+.perm-item input{margin-top:2px;flex:0 0 auto}
+.perm-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.perm-what{font-size:13px;color:var(--tx);line-height:1.4}
+/* the key is what the code checks - worth showing, not worth shouting */
+.perm-key{font-family:var(--mono);font-size:11px;color:var(--tx-3)}
+.perm-item input:disabled + .perm-text{opacity:.55}
+
+.perm-save{
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin-top:16px;padding-top:14px;border-top:1px solid var(--line-2);
+}
+
+/* a role linked to from the table gets a moment's highlight, so a jump down
+   the page lands somewhere obvious */
+.perm-card:target{box-shadow:0 0 0 2px var(--pb-red)}
+
+/* The chassis strip is a search now, so its own button needs the live styling
+   the dead "Find Month of Production" one beside it does not get. */
+.pb-chassis button.pb-btn{
+  padding:10px 20px;font-size:13.5px;border:0;cursor:pointer;
+  background:var(--pb-red);color:#fff;border-radius:3px;font-weight:600;
+}
+.pb-chassis button.pb-btn:hover{background:var(--pb-red-dk)}
+.pb-chassis input:focus{outline:none;border-color:var(--pb-red);color:var(--tx)}
+
+/* ---------------------------------------------------------------------------
+   A value the signed-in role may read but not change.
+
+   Where a permission is withheld the control is not disabled but removed, and
+   the value it would have held is printed in its place. A greyed-out select
+   still reads as "broken, try again"; a plain value reads as "this is how it
+   is", which is what the role has been told.
+   --------------------------------------------------------------------------- */
+.ro-value {
+  display: inline-block;
+  padding: 3px 9px;
+  border: 1px solid var(--line, #d6dade);
+  border-radius: 999px;
+  background: var(--paper, #f4f6f8);
+  color: var(--tx-2, #4a525a);
+  font-size: 12.5px;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+.ro-note {
+  display: inline-block;
+  margin-left: 7px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+  color: var(--tx-3, #7b848d);
+  font-size: 12.5px;
+}
+@media (max-width: 640px) {
+  .ro-note { max-width: 140px; }
+}
+
+/* ---------------------------------------------------------------------------
+   The role strip on the Permissions screen.
+
+   Every role as a chip along the top, the open one filled. The alternative was
+   a dropdown, which hides how many roles there are and how much each one holds
+   - the two things somebody comes to this screen already wondering about.
+   --------------------------------------------------------------------------- */
+.role-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 18px;
+}
+.role-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--tx-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: border-color .12s, color .12s;
+}
+.role-chip:hover { border-color: var(--tx-3); color: var(--tx); }
+.role-chip.is-on {
+  background: var(--tx);
+  border-color: var(--tx);
+  color: #fff;
+}
+.role-chip-n {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--tx-2);
+  font-size: 11.5px;
+  font-weight: 700;
+  text-align: center;
+}
+.role-chip.is-on .role-chip-n { background: rgba(255,255,255,.18); color: #fff; }
+
+/* ---------------------------------------------------------------------------
+   One enquiry: the conversation beside the facts.
+
+   Two columns on a desk, stacked on a phone with the conversation first - the
+   letter is what the reader came for; the client's phone number is what they
+   look up afterwards.
+   --------------------------------------------------------------------------- */
+.detail-top { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.detail-top .spacer { flex: 1; }
+
+.enq-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 18px;
+  align-items: start;
+}
+.enq-side { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+
+/* A message. Theirs sits left and plain, ours is tinted and indented, so which
+   way a line was going is answered before it is read. */
+.msg { margin: 0 0 14px; }
+.msg-h {
+  display: flex; align-items: baseline; gap: 10px;
+  margin-bottom: 6px; font-size: 13px;
+}
+.msg-when { color: var(--tx-3); font-size: 12.5px; }
+.msg-body {
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.msg-out { margin-left: 28px; }
+.msg-out .msg-body { background: var(--accent-soft); border-color: #f0d5cd; }
+
+/* label/value pairs in the side cards */
+.kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px 14px; margin: 0; }
+.kv dt { color: var(--tx-3); font-size: 12.5px; }
+.kv dd { margin: 0; font-size: 13.5px; font-weight: 600; overflow-wrap: anywhere; }
+
+.enq-others { list-style: none; margin: 0; padding: 0; }
+.enq-others li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.enq-others li:last-child { border-bottom: 0; }
+.enq-others-meta { display: block; color: var(--tx-3); font-size: 12px; margin-top: 2px; }
+
+/* the client's email under their name in the list */
+.enq-em { display: block; color: var(--tx-3); font-size: 12px; font-weight: 400; }
+.enq-snip { color: var(--tx-2); font-size: 13px; max-width: 320px; }
+
+@media (max-width: 900px) {
+  .enq-detail { grid-template-columns: minmax(0, 1fr); }
+  .msg-out { margin-left: 14px; }
+}
+
+/* ---------------------------------------------------------------------------
+   The Bids table, and why it was breaking.
+
+   Eight columns, the last of them a select, a text box and a button, in
+   whatever width was left. The table was set to 100% and nothing stopped it
+   compressing, so instead of overflowing into the scroller it already sits in,
+   it crushed every cell until the words came apart: "Save" broke after three
+   letters, ¥920,000 broke after the comma, lot 50110 broke after four digits.
+   A number split across two lines is not a number any more - it is two.
+
+   So: a floor width, and let the wrapper scroll. Below that floor the reader
+   drags sideways, which is honest; above it nothing moves at all.
+   --------------------------------------------------------------------------- */
+.bids-table { min-width: 1040px; }
+
+/* The three controls in the last cell were 130 + 120 + a button in whatever was
+   left, which pushed the button off the end of the table. Narrower: a status is
+   one word, and a note here is a few - anything longer belongs in the enquiry,
+   not in a cell. */
+.bids-table .bid-admin-form .select { width: 108px; }
+.bids-table .bid-admin-form .input  { width: 96px; }
+.bids-table td,
+.bids-table th { padding-left: 10px; padding-right: 10px; }
+
+/* Anything that is one indivisible thing - a sum, a lot number, a date, the
+   word on a button - says so. */
+.bids-table td.no-break,
+.bid-admin-form .btn,
+.bid-admin-form .select { white-space: nowrap; }
+
+.bid-admin-form { flex-wrap: nowrap; }
+.bid-admin-form .btn { flex: 0 0 auto; }
+
+/* The address is the one thing here long enough to earn a break, but it should
+   break where an address breaks - not mid-word. */
+.bids-table .enq-em { overflow-wrap: anywhere; }
+
+/* The enquiry and role lists use the same table as every other admin screen.
+   They were written with a different class and so came out without the grey
+   header band the rest of the panel has - the panel read as two products. */
+.enq-table { min-width: 1000px; }
+.enq-table td.no-break,
+.roles-table td.no-break { white-space: nowrap; }
+.enq-table .enq-em { display: block; font-size: 12px; color: var(--tx-3); }
+.enq-table .enq-snip { max-width: 260px; }
+.roles-table .role-rename,
+.roles-table .role-acts { display: flex; gap: 6px; align-items: center; }
+.roles-table .role-acts { flex-wrap: wrap; }
+.roles-table .btn { white-space: nowrap; }
+
+/* The staff row carries a role picker, an active tick, a password box and a
+   button. Squeezed into what was left of the table, "active" came apart into
+   one letter per line - a word set in a column narrower than the word. Same
+   remedy as the bids table: a floor width, and nothing here breaks mid-word. */
+.staff-table { min-width: 1020px; }
+.staff-table .facet-item,
+.staff-table .facet-item .fv,
+.staff-table .btn { white-space: nowrap; }
+.staff-table .facet-item { display: inline-flex; align-items: center; gap: 6px; }
+.staff-table .bid-admin-form { flex-wrap: nowrap; }
+.staff-table .pw-wrap .input { width: 138px; }
+.staff-table .select { width: 132px; }
+
+/* ---------------------------------------------------------------------------
+   The Overview's charts.
+
+   Drawn as SVG on the server, so they are in the page before any script runs
+   and are still there if none does. Every figure a chart shows is also written
+   beside the mark and again in the table underneath - nothing here is readable
+   only by telling two colours apart.
+   --------------------------------------------------------------------------- */
+.viz-row {
+  display: grid;
+  /* `minmax(360px, 1fr)` alone makes every column at least 360px wide - which on
+     a 360px phone is wider than the space the card has, and the whole desk page
+     then slid sideways by twelve pixels. `min(360px, 100%)` keeps the 360 on a
+     screen that has room for it and lets the column be the full width when it
+     does not. */
+  grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr));
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.viz-card { margin-bottom: 0; }
+
+/* Never wider than it was drawn. An SVG set to 100% of a full-width card
+   scaled a 640-unit chart to 1,090 and blew the labels up with it - a bar chart
+   in headline type. It shrinks below this happily; it just does not grow. */
+.viz { width: 100%; max-width: 660px; height: auto; display: block; overflow: visible; }
+.viz-lab  { font-size: 13px; fill: var(--tx); font-weight: 600; }
+.viz-val  { font-size: 13px; fill: var(--tx); font-weight: 700; font-variant-numeric: tabular-nums; }
+.viz-note { font-size: 12px; fill: var(--tx-3); font-weight: 500; }
+.viz-tick { font-size: 11px; fill: var(--tx-3); font-variant-numeric: tabular-nums; }
+
+.viz-legend { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+.viz-key { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--tx-2); }
+.viz-key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* The figures, folded away. Open it and the chart's numbers are a table. */
+.viz-table { margin-top: 14px; border-top: 1px solid var(--line-2); padding-top: 10px; }
+.viz-table summary {
+  cursor: pointer; font-size: 12.5px; color: var(--tx-2);
+  list-style: none; display: inline-flex; align-items: center; gap: 6px;
+}
+.viz-table summary::before { content: "▸"; font-size: 10px; }
+.viz-table[open] summary::before { content: "▾"; }
+.viz-table summary::-webkit-details-marker { display: none; }
+.viz-table table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 12.5px; }
+.viz-table th {
+  text-align: left; padding: 5px 8px; color: var(--tx-3);
+  font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+}
+.viz-table td {
+  padding: 5px 8px; border-top: 1px solid var(--line-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   What customers have been doing.
+
+   Four tables read as one story, newest first. With a handful of customers this
+   says more than any of the charts above it, and it goes on saying it when
+   there are a thousand.
+   --------------------------------------------------------------------------- */
+.tl { list-style: none; margin: 0; padding: 0; }
+.tl-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 10px 0; border-bottom: 1px solid var(--line-2);
+}
+.tl-item:last-child { border-bottom: 0; }
+.tl-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--tx-3); }
+.tl-registered .tl-dot { background: #2a78d6; }
+.tl-enquired   .tl-dot { background: #eb6834; }
+.tl-bid        .tl-dot { background: #1baf7a; }
+.tl-ordered    .tl-dot { background: #1c5cab; }
+.tl-body { flex: 1; min-width: 0; font-size: 13.5px; overflow-wrap: anywhere; }
+.tl-verb { color: var(--tx-2); }
+.tl-what { color: var(--tx-2); }
+.tl-when { color: var(--tx-3); font-size: 12.5px; white-space: nowrap; }
+.tl-go {
+  font-size: 12px; color: var(--tx-2); text-decoration: none;
+  border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; white-space: nowrap;
+}
+.tl-go:hover { border-color: var(--tx-3); color: var(--tx); }
+
+@media (max-width: 640px) {
+  .tl-item { flex-wrap: wrap; }
+  .tl-when, .tl-go { font-size: 11.5px; }
+}
+
+/* A heading that groups the cards under it. The Overview had grown to a dozen
+   cards in one column with nothing saying which of them belonged together. */
+.sec-h {
+  font-size: 13px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--tx-3); margin: 26px 0 12px;
+}
+.sec-h:first-of-type { margin-top: 18px; }
+
+/* A table inside a chart card: same rows, a size down. */
+.mini-table { font-size: 13px; }
+.mini-table th { padding: 8px 10px; }
+.mini-table td { padding: 9px 10px; }
+.mini-table .enq-em { display: block; font-size: 11.5px; color: var(--tx-3); font-weight: 400; }
+.kpi .s a { color: var(--tx-2); }
+
+/* ---------------------------------------------------------------------------
+   Rings, and the legend that does the work the colours cannot.
+
+   Three of the six hues sit below 3:1 against white, so no slice is left to be
+   read by its colour: the legend carries the name, the count and the share, and
+   the table underneath repeats all three.
+   --------------------------------------------------------------------------- */
+.viz-row-3 { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+
+.viz-donut { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+.viz-ring { width: 150px; height: 150px; flex: 0 0 auto; }
+.viz-ring-n { font-size: 26px; font-weight: 800; fill: var(--tx); }
+.viz-ring-k { font-size: 11px; fill: var(--tx-3); letter-spacing: .06em; text-transform: uppercase; }
+
+.viz-keys { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 150px; }
+.viz-keys li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 0; font-size: 12.5px;
+}
+.viz-keys i { width: 10px; height: 10px; border-radius: 3px; flex: 0 0 auto; }
+.viz-keys-l { color: var(--tx-2); flex: 1; }
+.viz-keys-v { font-weight: 700; color: var(--tx); font-variant-numeric: tabular-nums; }
+.viz-keys-v em { font-style: normal; font-weight: 500; color: var(--tx-3); }
+
+/* Thin meters: one whole, several holders. */
+.viz-meters { list-style: none; margin: 0; padding: 0; }
+.viz-meters li { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 12.5px; }
+.vm-l { flex: 0 0 120px; color: var(--tx-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vm-bar { flex: 1; height: 8px; border-radius: 999px; background: var(--line-2); overflow: hidden; }
+.vm-bar span { display: block; height: 100%; border-radius: 999px; }
+.vm-v { flex: 0 0 auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vm-v em { font-style: normal; font-weight: 500; color: var(--tx-3); }
+
+.reach { margin-top: 18px; border-top: 1px solid var(--line-2); padding-top: 14px; }
+.reach h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--tx-3); margin: 0 0 8px;
+}
+
+/* Four dots: how far one customer has come. The numbers in the same row say it
+   precisely; these say it at a glance, down a column of twenty. */
+.steps { display: inline-flex; gap: 4px; }
+.steps i {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--line); display: inline-block;
+}
+.steps i.on { background: #2a78d6; }
+.journey-table { min-width: 900px; }
+
+/* A count that has just changed, on a page nobody reloaded.
+   Brief and quiet: it says "this moved" and gets out of the way, because these
+   numbers move all day and a reader mid-sentence should not be pulled away. */
+.live-changed {
+  animation: liveChanged 1.4s ease-out;
+}
+@keyframes liveChanged {
+  0%   { background: rgba(214, 40, 40, .18); }
+  100% { background: transparent; }
+}
+
+/* ---------------------------------------------------------------- staff
+   Two doors on the Staff screen, and a list that reads rather than edits.
+   The list used to hold a live form in every row - a select, a checkbox and a
+   password box per person - which looked like a spreadsheet and invited a
+   change to somebody's access with one stray click. Now a row states what is
+   true and the buttons lead somewhere that asks properly. */
+.staff-hub{grid-template-columns:repeat(auto-fit,minmax(260px,1fr));}
+.hub-tile{
+  display:block;text-decoration:none;color:inherit;
+  transition:border-color .15s,box-shadow .15s,transform .15s;
+}
+.hub-tile:hover{
+  border-color:var(--accent);box-shadow:0 4px 16px rgba(0,0,0,.07);
+  transform:translateY(-1px);color:inherit;
+}
+.hub-tile .v{font-size:20px;}
+.hub-tile .s{color:var(--tx-2);}
+
+/* A word for a state, not a control that changes it. */
+.pill{
+  display:inline-block;padding:2px 10px;border-radius:999px;
+  font-size:11.5px;font-weight:650;letter-spacing:.01em;white-space:nowrap;
+}
+.pill-ok{background:#e7f6ec;color:#1a7a3c;}
+.pill-off{background:#f0f1f2;color:#7b8085;}
+
+.row-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;}
+.inline-form{display:inline;margin:0;}
+.btn-sm{padding:5px 12px;font-size:12.5px;line-height:1.4;}
+.ta-r{text-align:right;}
+.alert-link{margin-left:10px;font-weight:650;text-decoration:underline;}
+
+.staff-table .sub2{
+  display:block;font-size:11px;color:var(--tx-3);font-weight:400;margin-top:2px;
+}
+.staff-form .field label .bound{
+  font-size:11px;color:var(--tx-3);font-weight:400;margin-left:4px;
+}
+
+/* --------------------------------------------------- a sidebar entry that opens
+   Staff is two errands, not one, and they were behind a landing page whose only
+   content was the choice between them. <details> because the browser already
+   knows how to do this: it opens with a click or the keyboard, it survives with
+   no script, and the open section stays open because the page sets it. */
+.nav-drop{margin-bottom:2px;}
+.nav-drop > summary{
+  display:flex;align-items:center;gap:11px;
+  padding:9px 12px;border-radius:var(--radius-sm);
+  color:#c9d1d9;font-size:13.5px;font-weight:550;
+  cursor:pointer;list-style:none;
+  transition:background .15s,color .15s;
+}
+.nav-drop > summary::-webkit-details-marker{display:none;}
+.nav-drop > summary:hover{background:rgba(255,255,255,.07);color:#fff;}
+.nav-drop > summary.on{color:#fff;}
+.nav-caret{
+  width:15px;height:15px;flex:0 0 auto;opacity:.55;
+  transition:transform .18s ease;
+}
+.nav-drop[open] > summary .nav-caret{transform:rotate(180deg);opacity:.9;}
+
+/* The children are indented under the mark, not under the text, so the group
+   reads as one block rather than a second list that happens to sit below. */
+.nav-kids{padding:2px 0 4px 29px;}
+.admin-nav .nav-kids a{
+  padding:7px 12px;font-size:13px;font-weight:500;color:#a9b3bd;
+}
+.admin-nav .nav-kids a:hover{color:#fff;}
+.admin-nav .nav-kids a.on{background:var(--accent);color:#fff;}
+
+/* --------------------------------------------------------- forms, two to a row
+   Five fields in one column made a short form read as a long one: the eye ran
+   the height of the card to fill in what is really three quick pairs. Pairs
+   that belong together sit together - a username beside the name it is for.
+   One column on a narrow screen, where two would be two cramped ones. */
+/* Two, said plainly, not auto-fit. auto-fit counts how many 250px tracks the
+   room allows, and on a wide screen the room allowed three - so the pairs that
+   were meant to sit together (a username beside the name it stands for) broke
+   apart and the last row was left half empty.
+   One column below 640px, where two would be two cramped ones. */
+.form-grid{
+  display:grid;gap:20px 22px;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:start;
+}
+.form-grid > .field-full{grid-column:1 / -1;}
+@media (max-width:640px){
+  .form-grid{grid-template-columns:1fr;}
+}
+
+/* Setting a password from the row it belongs to. */
+.pw-row{display:flex;gap:8px;align-items:center;margin:0;}
+.pw-row .pw-wrap{flex:1;min-width:150px;}
+.pw-row .input{font-size:13px;padding-top:6px;padding-bottom:6px;}
+
+/* ------------------------------------------------------------- a form to fill in
+   The fields were right and the form was still hard to face: nothing said what
+   a username may contain, or that a password once saved can never be read back,
+   so every answer was a guess and the one irreversible field looked like the
+   other four. A line under each field costs a sentence and removes the guess. */
+.fhint{
+  font-size:12px;line-height:1.45;color:var(--tx-3);margin:1px 0 0;
+}
+.fhint a{color:var(--accent);font-weight:600;}
+.req{color:var(--accent);font-weight:700;margin-left:1px;}
+
+/* A field may take the width of the form without its input taking it too. A
+   password box the width of the card looks like it wants a paragraph; the
+   sentence underneath is what wanted the room. */
+.field-full .pw-narrow{max-width:400px;}
+.fhint strong{color:var(--tx);font-weight:650;}
+
+/* Saving is not one more field. It sits on its own bar against the foot of the
+   card, so the eye finds it after the form rather than among it - and at the
+   right-hand end, where a form's last step is looked for. Cancel sits to its
+   left: the quiet one first, so the button under the thumb is the one meant. */
+/* A form does not want the width of the screen. Fields 330px wide spread over
+   a thousand read as a table, and the eye loses which label belongs to which
+   box on the way back from the right-hand edge. */
+.form-card{max-width:820px;}
+.form-card .admin-card-body{padding:20px;}
+.form-foot{
+  display:flex;gap:10px;align-items:center;justify-content:flex-end;
+  padding:14px 20px;border-top:1px solid var(--line);background:#fafafa;
+}
+@media (max-width:520px){
+  .form-foot{flex-direction:column-reverse;align-items:stretch;}
+  .form-foot .btn{width:100%;}
+}
+.admin-card-head .page-info .req{margin:0 1px;}
+
+/* .staff-form is a five-column grid, from when five fields sat on one line. A
+   form now wraps the card's body and its footer bar, and as items of that grid
+   they were handed a fifth of the width each: a 1073px form whose body came out
+   205px wide, so the two-column layout inside could not fit its second column
+   and every field stacked into one narrow strip down the left.
+
+   The old rule still has callers, so it stays. A form built the new way says so
+   and flows normally; the columns inside are .form-grid's business. */
+.staff-form.stack{display:block;}
+
+/* Eight columns is more than the width has, and the table gave way by breaking
+   words down the middle: "Administrato / r", "zzbrowse / r", an address split
+   after "gmail.co". A name broken mid-word is harder to read than one that
+   needs a scroll, and .table-responsive is already there to scroll it. So the
+   cells keep their words whole and the table takes the width it needs. */
+.staff-table th,
+.staff-table td{white-space:nowrap;}
+.staff-table td .sub2{white-space:normal;}
+
+/* The password box only ever holds a password being typed once; at the width
+   of a name column it showed "At least 8 chara" and nothing else. */
+.staff-table .pw-row{gap:6px;}
+/* 160 put the table fifteen pixels over the card and clipped the Delete button
+   at the right-hand edge; 140 is still room enough to type a password into. */
+.staff-table .pw-row .pw-wrap{min-width:0;width:140px;}
+.staff-table .pw-row .input{width:140px;}
+
+/* What the overlay says when the picture behind it does not exist. Without it
+   the reader met a black screen that would not scroll, and read it as a hang. */
+.pb-lb-note{
+  color:#fff;font-size:15px;text-align:center;margin:0;padding:26px 30px;
+  background:rgba(255,255,255,.08);border-radius:var(--radius-sm);
+}
+
+/* =============================================== phones: legible, and reachable
+   Written 15 September 2026 from what was actually measured, not from a rule of
+   thumb: every page of the portal and the chat was opened at nine widths from a
+   360px phone to a 2560px monitor and each element compared against the viewport
+   (sbk-tools/responsivecheck.py). Four faults let the page slide sideways and
+   were fixed where they were caused; what is left is here, and it is only two
+   things, and only on a phone.
+
+   ONE. The micro-labels are 10.5px. On a desktop card that is a deliberate,
+   quiet size; on a phone at arm's length it is below what can be read, so they
+   go to 11.5px. Nothing else about them changes - same weight, same spacing, so
+   no card grows and no row re-wraps.
+
+   TWO. Controls a finger has to find were 15-26px tall, under the ~28px a thumb
+   reliably hits. They are given a minimum height, which adds nothing visually
+   because the room was already inside their padding.
+
+   What is deliberately NOT changed: links inside a sentence - "Create one" after
+   "No account yet?", "Sign in on the website", a car's name inside a table cell.
+   Padding those to 28px would break the line of text they sit in, which is worse
+   than the thing it fixes; every guideline that asks for 28px exempts them, and
+   the row they sit in is itself a comfortable target. */
+@media (max-width: 480px) {
+  /* Each of these is written at the specificity that actually wins: a bare
+     `.who` loses to `.thread-reply .who`, and a bare `small` to `.price small`,
+     so both are named in full rather than trusted to cascade. */
+  .live-badge, .status-badge, .chip-staff, .chip-status,
+  .kpi .k, .stat-tile .k, .make-group-label, small,
+  .who, .thread-reply .who, .price small {
+    font-size: 11.5px;
+  }
+  .col-sort, .pb-range-h, .pb-lnk, .pb-mk, .tl-go,
+  .admin-nav a, .pb-step, .btn-ghost, .kpi .s a, .stat-tile .s a {
+    min-height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .ltr { min-width: 30px; min-height: 30px; }
+
+  /* The vehicle's name is how a row is opened on the desk's lists, so it is a
+     control however much it looks like text. Padding rather than a min-height:
+     the name wraps to two lines on a narrow screen and a fixed height would
+     clip the second one. */
+  .table-responsive td > a[href*="car-details.php"] {
+    display: inline-block;
+    padding-block: 6px;
+  }
+
+  /* The rest of the row's own controls. `.wish` stays a block so it keeps its
+     line; the lot number and the breadcrumb grow through padding so neither
+     moves anything around it. */
+  .lot-table .wish { display: flex; align-items: center; min-height: 30px; margin: 2px 0; }
+  .lot-table .lot-no { padding-block: 6px; }
+  .crumbs a { display: inline-block; padding-block: 6px; }
+
+  /* And the links that live inside a sentence - "No account yet? Create one",
+     "I agree to Terms & Conditions", "named on the Roles screen". These were
+     left at 17-19px at first because padding a link to 28px normally breaks the
+     line it sits in. It does not have to: vertical padding on an INLINE element
+     extends where a finger lands without altering the line box, so the sentence
+     is set exactly as before and the target is a comfortable thirty-one pixels.
+     (Only inline links - anything made a block or a flex item is handled above,
+     where the padding would move things.) */
+  p a, .lede a, .hint a, .bid-tc a, label a, .gate-note a, .muted a {
+    padding-block: 7px;
+  }
+
+  /* A card's title is a link wrapped AROUND the heading - `<a><h3></h3></a>` -
+     and an inline anchor holding a block element ends up a twenty-pixel sliver
+     while the heading it contains draws full width. Made a block it takes the
+     heading's box, which is still only the twenty pixels of one clamped line, so
+     it is padded to a reachable height as well. The card does not grow: the
+     padding is taken out of the body's own top and bottom. */
+  .car-body > a { display: block; padding-block: 5px; }
+  .car-body { padding-block: 8px 10px; }
+}

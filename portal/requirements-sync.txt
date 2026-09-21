@@ -1,0 +1,7 @@
+# SBK Auction — sync worker dependencies
+#   pip install -r requirements-sync.txt
+#   python -m playwright install chromium
+
+mysql-connector-python>=8.0.33
+playwright>=1.40.0
+python-dotenv>=1.0.0

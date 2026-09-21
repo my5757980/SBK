@@ -1,0 +1,43 @@
+# ---------------------------------------------------------------------------
+# Secrets — never committed. Every password and token is read at run time from
+# the server's own .env and from wp-config.php; nothing of the sort belongs here.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+firebase-keys/
+service-account*.json
+*.pem
+*.key
+*.keystore
+*.jks
+session_cookies.json
+cp.txt
+
+# ---------------------------------------------------------------------------
+# Built, downloaded or generated — all of it comes back with one command
+# ---------------------------------------------------------------------------
+node_modules/
+**/node_modules/
+application/android/
+application/ios/
+application/.expo/
+dist/
+build/
+*.apk
+*.aab
+
+# ---------------------------------------------------------------------------
+# Runtime output
+# ---------------------------------------------------------------------------
+*.log
+error_log
+*.out
+*.lock
+*.keep
+media/
+**/media/
+.DS_Store
+Thumbs.db

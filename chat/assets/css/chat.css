@@ -1,0 +1,975 @@
+/* SBK Chat — the whole look, in one file.
+   ===========================================================================
+   THE PALETTE IS THE LOGO'S, AND ONLY THE LOGO'S.
+
+   Every colour below was lifted out of assets/img/sbk-logo.png with a pixel
+   counter, not chosen by eye:
+
+       #BC1E2D   23.6% of the mark   the letters SBK and the globe
+       #18335E    4.6%               the hull of the ship
+       #0370CD    0.7%               the water under it
+
+   That is the whole brand and there is nothing else in it. An earlier version
+   of this file carried a gold and two blues that appear nowhere in the company's
+   identity, which is why it looked like a chat widget somebody bought rather
+   than SBK's own desk. Nothing here invents a colour: greys are neutral, green
+   means one thing only (a person is at their desk), and red is the mark's red.
+
+   The type stack is the auction portal's, in the same order, so a customer who
+   crosses from one to the other is looking at one company.
+
+   NOTHING IS FETCHED FROM ANYWHERE ELSE — no web font, no icon pack, no CSS
+   framework. The owner's standing instruction is that the site must never hang,
+   and a page that waits on somebody else's server is a page that can. Every
+   icon is inline SVG in the markup; every face is two letters on a brand disc.
+
+   Motion is deliberate and short: 140-360ms, one easing curve, and the whole
+   lot switches off for anybody whose system asks for less of it (bottom of the
+   file). Animation should make the screen feel answered, never make it wait.
+   ========================================================================= */
+
+:root{
+  /* ---- the mark ---------------------------------------------------------- */
+  --red:#bc1e2d;
+  --red-dk:#9c1825;
+  --red-lt:#d9394a;
+  --red-wash:#fdeef0;
+
+  --navy:#18335e;
+  --navy-dk:#0e1f3d;
+  --navy-lt:#2a4c82;
+  --navy-wash:#eef2f9;
+
+  --blue:#0370cd;
+  --blue-dk:#0159a4;
+  --blue-lt:#3f97e2;
+  --blue-wash:#e9f3fd;
+
+  /* ---- neutrals, warmed a shade towards the portal's paper --------------- */
+  --paper:#f4f6f9;
+  --card:#ffffff;
+  --line:#e3e7ee;
+  --line-2:#eef1f6;
+  --tx:#0f1c2e;
+  --tx-2:#54617a;
+  --tx-3:#8b96aa;
+
+  /* ---- the two things that carry meaning --------------------------------- */
+  --live:#12a150;                    /* somebody is at their desk */
+  --live-wash:#e6f6ee;
+  --tick:#8fd0ff;                    /* read, on a navy bubble */
+
+  /* ---- shape ------------------------------------------------------------- */
+  --r-xs:7px; --r-sm:10px; --r:13px; --r-lg:17px; --r-xl:22px; --r-pill:999px;
+
+  /* ---- depth. Four steps, and a screen should use two of them ------------ */
+  --e1:0 1px 2px rgba(15,28,46,.05);
+  --e2:0 1px 3px rgba(15,28,46,.07), 0 6px 16px -8px rgba(15,28,46,.14);
+  --e3:0 2px 6px rgba(15,28,46,.07), 0 18px 44px -16px rgba(15,28,46,.24);
+  --e4:0 30px 80px -24px rgba(6,16,34,.55);
+
+  /* ---- motion ------------------------------------------------------------ */
+  --ease:cubic-bezier(.2,.8,.25,1);
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --fast:.14s; --mid:.22s; --slow:.38s;
+
+  --font:"Inter","Segoe UI",-apple-system,BlinkMacSystemFont,Roboto,Helvetica,Arial,sans-serif;
+}
+
+*{box-sizing:border-box}
+
+/* `hidden` has to win. The compose bar carries it until a conversation is
+   opened, and `display:flex` further down is more specific than the browser's
+   own rule for [hidden] - so the box sat there inviting somebody to write to
+   nobody. */
+[hidden]{display:none!important}
+
+html,body{height:100%}
+body{
+  margin:0;background:var(--paper);color:var(--tx);
+  font:15px/1.55 var(--font);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  text-rendering:optimizeLegibility;
+}
+a{color:var(--blue);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font:inherit;color:inherit}
+::selection{background:rgba(3,112,205,.18)}
+
+/* A focus ring somebody can see, in the brand's blue, and only for keyboards.
+   Professional does not mean invisible - it means deliberate. */
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px;border-radius:4px}
+
+/* Thin, quiet scrollbars. The default Windows bar is 17px of grey furniture
+   down the middle of a conversation. */
+*{scrollbar-width:thin;scrollbar-color:#c8d0dd transparent}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{
+  background:#ccd4e0;border-radius:999px;border:2.5px solid transparent;background-clip:content-box;
+}
+::-webkit-scrollbar-thumb:hover{background:#aeb9c9;background-clip:content-box}
+
+/* ===================================================== the way in ========= */
+
+/* `margin:auto` on the card rather than `align-items:center` on the box.
+   Centring a flex child that is taller than its container cuts the TOP off it,
+   and the top is where the logo is - so on a short laptop window the card
+   arrived headless. Auto margins centre the same way and give way to scrolling
+   the moment the card no longer fits. */
+.gate{
+  min-height:100%;display:flex;justify-content:center;padding:24px;
+  position:relative;overflow-y:auto;
+  /* The hull, with the mark's red and the water's blue thrown across it. Three
+     colours from one logo and not a fourth from anywhere. */
+  background:
+    radial-gradient(880px 460px at 8% -12%, rgba(3,112,205,.34), transparent 62%),
+    radial-gradient(720px 420px at 108% 112%, rgba(188,30,45,.26), transparent 60%),
+    linear-gradient(158deg, #1c3a69 0%, var(--navy) 34%, var(--navy-dk) 100%);
+  background-color:var(--navy-dk);
+}
+/* The globe's longitude lines, abstracted: a grid that drifts, slowly enough
+   that it is felt rather than watched. */
+/* Fixed, not absolute: an absolute layer bled 40% past the bottom edge of a box
+   that is now allowed to scroll, and the page scrolled into empty gradient. */
+.gate::before{
+  content:"";position:fixed;inset:-40%;pointer-events:none;opacity:.5;z-index:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+  background-size:52px 52px;
+  transform:rotate(-8deg);
+  animation:drift 70s linear infinite;
+}
+@keyframes drift{from{background-position:0 0}to{background-position:52px 52px}}
+
+.gate-card{
+  position:relative;margin:auto;width:100%;max-width:436px;background:var(--card);
+  border-radius:var(--r-xl);box-shadow:var(--e4);overflow:hidden;flex:0 0 auto;
+  animation:rise .5s var(--ease-out) both;
+}
+@keyframes rise{
+  from{opacity:0;transform:translateY(16px) scale(.985)}
+  to{opacity:1;transform:none}
+}
+/* The mark's red running into the water's blue, along the top edge of the card
+   - the same hairline the conversation's own bar carries, so the two screens
+   are plainly the same product. (The navy was in this strip once and had to go:
+   against the navy behind the card it read as a gap rather than a colour.) */
+.gate-card::before{
+  content:"";position:absolute;left:0;right:0;top:0;height:4px;
+  background:linear-gradient(90deg,var(--red) 0%,var(--red) 42%,var(--blue) 100%);
+}
+
+.gate-head{padding:30px 30px 22px;text-align:center}
+.gate-head img{height:52px;width:auto;display:block;margin:0 auto 18px}
+.gate-head h1{
+  margin:0 0 6px;font-size:21px;font-weight:750;letter-spacing:-.25px;color:var(--navy);
+}
+.gate-head p{margin:0;font-size:13.5px;color:var(--tx-2);line-height:1.55}
+.gate-body{padding:6px 30px 30px}
+
+.field{margin-bottom:15px}
+.field label{
+  display:block;margin-bottom:7px;font-size:11px;font-weight:750;
+  letter-spacing:.09em;text-transform:uppercase;color:var(--tx-2);
+}
+.field input{
+  width:100%;height:48px;padding:0 15px;font:inherit;font-size:15px;color:var(--tx);
+  background:var(--card);border:1.5px solid var(--line);border-radius:var(--r);outline:none;
+  transition:border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease),
+             background var(--fast) var(--ease);
+}
+.field input:hover{border-color:#cdd6e3}
+.field input:focus{
+  border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-wash);outline:none;
+}
+.field input::placeholder{color:#aeb8c7}
+
+.btn{
+  position:relative;overflow:hidden;
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  height:50px;padding:0 22px;border:0;border-radius:var(--r);cursor:pointer;
+  font-size:15px;font-weight:680;letter-spacing:.01em;color:#fff;
+  background:linear-gradient(180deg,var(--navy-lt),var(--navy));
+  box-shadow:var(--e2);
+  transition:transform var(--fast) var(--ease), box-shadow var(--mid) var(--ease),
+             filter var(--fast) var(--ease);
+}
+.btn svg{transition:transform var(--mid) var(--ease)}
+.btn:hover{transform:translateY(-1px);box-shadow:var(--e3);filter:brightness(1.06)}
+.btn:hover svg{transform:translateX(3px)}
+.btn:active{transform:translateY(0);box-shadow:var(--e1)}
+.btn:disabled{opacity:.55;cursor:default;transform:none;box-shadow:var(--e1)}
+.btn-full{width:100%}
+.btn-ghost{background:var(--card);color:var(--tx);border:1.5px solid var(--line);box-shadow:none}
+.btn-ghost:hover{background:var(--paper);filter:none}
+
+.gate-note{margin:16px 0 0;font-size:12.5px;color:var(--tx-3);text-align:center;line-height:1.7}
+.gate-note a{font-weight:650}
+
+.alert{
+  margin:0 0 15px;padding:11px 14px;border-radius:var(--r-sm);font-size:13.5px;
+  background:var(--red-wash);color:var(--red-dk);border:1px solid #f4cdd1;
+  border-left:3px solid var(--red);
+  animation:shake .34s var(--ease) both;
+}
+.alert-ok{
+  background:var(--live-wash);color:#0d6b38;border-color:#c3e8d4;border-left-color:var(--live);
+  animation:none;
+}
+@keyframes shake{
+  0%,100%{transform:translateX(0)}
+  22%{transform:translateX(-5px)} 44%{transform:translateX(4px)}
+  66%{transform:translateX(-2px)} 88%{transform:translateX(1px)}
+}
+
+/* ================================================ the conversation ======== */
+
+.app{height:100%;display:flex;flex-direction:column;background:var(--paper)}
+
+/* ---- the bar ------------------------------------------------------------ */
+.top{
+  position:relative;z-index:20;
+  height:64px;flex:0 0 64px;display:flex;align-items:center;gap:13px;
+  padding:0 16px;color:#fff;
+  background:linear-gradient(180deg,var(--navy-lt) -40%,var(--navy) 46%,var(--navy-dk) 100%);
+  box-shadow:0 1px 0 rgba(255,255,255,.06) inset, var(--e2);
+}
+/* The mark's red, laid along the bottom of the navy bar - the two colours of
+   the logo meeting, which is the one detail that says SBK and not "a chat". */
+.top::after{
+  content:"";position:absolute;left:0;right:0;bottom:0;height:3px;
+  background:linear-gradient(90deg,var(--red) 0%,var(--red) 46%,var(--blue) 100%);
+  opacity:.95;
+}
+/* The logo is red and navy drawn for a white ground; on the navy bar its ship
+   would disappear. So it gets a plate of its own - a deliberate badge with a
+   ring, not a patch of white left behind by accident. */
+.top .mark{
+  display:flex;align-items:center;justify-content:center;
+  height:40px;padding:0 11px;background:#fff;border-radius:var(--r-sm);
+  box-shadow:0 0 0 1px rgba(255,255,255,.55), 0 4px 12px -4px rgba(6,16,34,.5);
+  flex:0 0 auto;
+}
+.top .mark img{height:24px;width:auto;display:block}
+
+.top .who{min-width:0;font-weight:660;font-size:15px;line-height:1.25}
+.top .who small{
+  display:block;font-weight:450;font-size:11.5px;color:#9db2cf;letter-spacing:.01em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.top .sp{margin-left:auto}
+.top .icon-btn{
+  background:transparent;border:0;cursor:pointer;padding:9px;border-radius:var(--r-sm);
+  display:inline-flex;position:relative;color:#cfe0f4;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease),
+             transform var(--fast) var(--ease);
+}
+.top .icon-btn:hover{background:rgba(255,255,255,.12);color:#fff}
+.top .icon-btn:active{transform:scale(.94)}
+
+.bell-dot{
+  position:absolute;top:3px;right:3px;min-width:18px;height:18px;padding:0 5px;
+  border-radius:var(--r-pill);background:var(--red);color:#fff;
+  font-size:11px;font-weight:750;line-height:1;
+  box-shadow:0 0 0 2px var(--navy);
+  display:none;align-items:center;justify-content:center;
+}
+.bell-dot.on{display:flex;animation:pop .34s var(--ease-out) both}
+/* When the number goes UP the bell says so once, and then stops. A badge that
+   never stops moving is a badge nobody looks at. */
+.icon-btn.ring svg{animation:ring .7s var(--ease) 1}
+@keyframes ring{
+  0%,100%{transform:rotate(0)}
+  12%{transform:rotate(-14deg)} 26%{transform:rotate(12deg)}
+  40%{transform:rotate(-9deg)}  54%{transform:rotate(7deg)}
+  68%{transform:rotate(-4deg)}  82%{transform:rotate(2deg)}
+}
+@keyframes pop{
+  0%{transform:scale(.4);opacity:0}
+  62%{transform:scale(1.14);opacity:1}
+  100%{transform:scale(1)}
+}
+
+.body{flex:1;display:flex;min-height:0}
+
+/* ---- the list of people (or of conversations) --------------------------- */
+.side{
+  position:relative;z-index:10;
+  width:318px;flex:0 0 318px;background:var(--card);
+  display:flex;flex-direction:column;min-height:0;
+  box-shadow:1px 0 0 var(--line), 6px 0 18px -14px rgba(15,28,46,.30);
+}
+.side-head{
+  display:flex;align-items:center;gap:8px;
+  padding:15px 17px 13px;border-bottom:1px solid var(--line-2);
+  font-size:11px;font-weight:780;letter-spacing:.13em;text-transform:uppercase;color:var(--tx-3);
+}
+.side-head::before{
+  content:"";width:3px;height:12px;border-radius:2px;background:var(--red);flex:0 0 auto;
+}
+/* Standing inside an agent, this line is the way back out to the agents. Only
+   an administrator ever sees it in that state - for everyone else the heading
+   is what it always was. */
+.side-head.is-back{
+  cursor:pointer;color:var(--tx-2);
+  transition:color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+.side-head.is-back:hover{color:var(--tx);background:var(--paper)}
+.side-list{flex:1;overflow-y:auto;min-height:0;padding:6px 0}
+
+.person{
+  position:relative;display:flex;align-items:center;gap:12px;
+  padding:11px 16px;cursor:pointer;
+  transition:background var(--fast) var(--ease);
+}
+/* The marker slides out of the left edge on hover and stays for the open one.
+   It is the same three pixels of navy either way, so choosing a conversation
+   feels like the screen finishing a movement it had already started. */
+.person::before{
+  content:"";position:absolute;left:0;top:7px;bottom:7px;width:3px;
+  border-radius:0 3px 3px 0;background:var(--navy);
+  transform:scaleY(0);transform-origin:center;
+  transition:transform var(--mid) var(--ease);
+}
+.person:hover{background:#f7f9fc}
+.person:hover::before{transform:scaleY(.55)}
+.person.on{background:var(--navy-wash)}
+.person.on::before{transform:scaleY(1)}
+.person.on .nm b{color:var(--navy)}
+.person:active{background:#eef2f8}
+
+.person .nm{flex:1;min-width:0}
+.person .nm b{
+  display:block;font-size:14.5px;font-weight:660;color:var(--tx);letter-spacing:-.1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  transition:color var(--fast) var(--ease);
+}
+.person .nm span{
+  display:block;font-size:12.5px;color:var(--tx-3);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.person .nm span.live{color:var(--live);font-weight:600}
+.person .meta{
+  text-align:right;flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px;
+}
+.person .meta em{display:block;font-style:normal;font-size:11px;color:var(--tx-3)}
+
+/* ---- "what's your name?" — asked once, above the list ------------------- */
+.ask-name{
+  margin:12px 12px 4px;padding:13px 14px 14px;border-radius:var(--r);
+  background:linear-gradient(160deg,var(--navy-wash),var(--blue-wash));
+  border:1px solid #d9e4f3;animation:msgIn .3s var(--ease-out) both;
+}
+.ask-name b{display:block;font-size:14px;font-weight:700;color:var(--navy)}
+.ask-name span{display:block;font-size:12.5px;color:var(--tx-2);margin:2px 0 10px}
+.ask-row{display:flex;gap:7px}
+.ask-row input{
+  flex:1;min-width:0;height:38px;padding:0 11px;font:inherit;font-size:14px;color:var(--tx);
+  background:#fff;border:1.5px solid var(--line);border-radius:var(--r-sm);outline:none;
+  transition:border-color var(--fast) var(--ease),box-shadow var(--fast) var(--ease);
+}
+.ask-row input:focus{border-color:var(--blue);box-shadow:0 0 0 3px var(--blue-wash)}
+.ask-row button{
+  flex:0 0 auto;height:38px;padding:0 15px;border:0;border-radius:var(--r-sm);cursor:pointer;
+  font-weight:680;font-size:13.5px;color:#fff;
+  background:linear-gradient(180deg,var(--navy-lt),var(--navy));
+  transition:filter var(--fast) var(--ease),transform var(--fast) var(--ease);
+}
+.ask-row button:hover{filter:brightness(1.08)}
+.ask-row button:active{transform:scale(.96)}
+.ask-row button:disabled{opacity:.55;cursor:default}
+.ask-err{display:block;margin-top:7px;font-style:normal;font-size:12px;color:var(--red-dk)}
+
+/* ---- faces --------------------------------------------------------------
+   Six discs, all mixed from the logo's own three colours. The version before
+   this one gave every person a random hue off the colour wheel, and a column of
+   twelve random hues is the single loudest thing a screen can do. */
+.av{
+  position:relative;flex:0 0 auto;width:44px;height:44px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:730;color:#fff;letter-spacing:.5px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.18), 0 2px 5px -2px rgba(15,28,46,.4);
+  user-select:none;
+}
+.av.sm{width:36px;height:36px;font-size:12.5px}
+.av-0{background:linear-gradient(140deg,#2a4c82,#18335e)}
+.av-1{background:linear-gradient(140deg,#3f97e2,#0370cd)}
+.av-2{background:linear-gradient(140deg,#d9394a,#bc1e2d)}
+.av-3{background:linear-gradient(140deg,#1f6ea8,#134a75)}
+.av-4{background:linear-gradient(140deg,#8e1b2a,#5e121c)}
+.av-5{background:linear-gradient(140deg,#4a6ea8,#26406e)}
+
+.dot{
+  position:absolute;right:-1px;bottom:-1px;width:13px;height:13px;border-radius:50%;
+  background:#bcc5d3;border:2.5px solid #fff;
+  transition:background var(--mid) var(--ease);
+}
+.dot.up{background:var(--live)}
+/* One soft ring, twice as slow as a heartbeat. Presence should read as calm. */
+.dot.up::after{
+  content:"";position:absolute;inset:-2.5px;border-radius:50%;
+  border:2px solid var(--live);opacity:0;animation:halo 2.6s var(--ease-out) infinite;
+}
+@keyframes halo{
+  0%{transform:scale(.8);opacity:.55}
+  70%,100%{transform:scale(2);opacity:0}
+}
+
+.pill{
+  display:inline-flex;align-items:center;justify-content:center;
+  min-width:21px;height:21px;padding:0 6px;border-radius:var(--r-pill);
+  background:var(--red);color:#fff;font-size:11.5px;font-weight:750;line-height:1;
+  box-shadow:0 2px 6px -2px rgba(188,30,45,.7);
+  animation:pop .3s var(--ease-out) both;
+}
+.tag{
+  display:inline-block;padding:2px 8px;border-radius:var(--r-pill);
+  font-size:10px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
+  background:var(--navy-wash);color:var(--navy);border:1px solid #d7e0ef;
+}
+
+/* ---- the skeleton, instead of the word "loading" ------------------------
+   The owner asked for no loading inside the chat. A row that is already the
+   right shape and simply has no words in it yet reads as a list arriving; the
+   word "Loading…" reads as a list that has not started. */
+.skel{padding:6px 0}
+.skel-row{display:flex;align-items:center;gap:12px;padding:11px 16px}
+.skel-b{
+  border-radius:var(--r-xs);
+  background:linear-gradient(90deg,#eef1f6 25%,#e3e8f0 37%,#eef1f6 63%);
+  background-size:400% 100%;animation:sheen 1.4s ease-in-out infinite;
+}
+.skel-av{width:44px;height:44px;border-radius:50%;flex:0 0 auto}
+.skel-l{flex:1}
+.skel-l i{display:block;height:10px;margin-bottom:7px}
+.skel-l i:last-child{width:58%;margin-bottom:0;height:9px}
+@keyframes sheen{from{background-position:100% 0}to{background-position:0 0}}
+
+/* ---- the messages ------------------------------------------------------- */
+.pane{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--paper)}
+.pane-head{
+  height:64px;flex:0 0 64px;display:flex;align-items:center;gap:12px;
+  padding:0 18px;background:var(--card);border-bottom:1px solid var(--line);
+  box-shadow:0 1px 0 rgba(15,28,46,.02), 0 6px 16px -16px rgba(15,28,46,.5);
+  animation:headIn var(--mid) var(--ease-out) both;
+}
+@keyframes headIn{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:none}}
+/* Nothing chosen, nothing to head. An empty bar with a dash in it reads as a
+   conversation that failed to load rather than as one nobody has opened. */
+.pane-head[hidden]{display:none!important}
+.pane-head .nm{min-width:0}
+.pane-head .nm b{
+  display:block;font-size:15.5px;font-weight:680;letter-spacing:-.15px;color:var(--tx);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.pane-head .nm span{
+  display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--tx-3);margin-top:1px;
+}
+.pane-head .nm span.live{color:var(--live);font-weight:600}
+/* The desk's header keeps the customer's e-mail and adds presence after it. */
+.pane-head .nm span i.on-now{font-style:normal;color:var(--live);font-weight:600;margin-left:2px}
+.pane-head .nm span.live::before{
+  content:"";width:7px;height:7px;border-radius:50%;background:var(--live);flex:0 0 auto;
+}
+
+.scroll{
+  flex:1;overflow-y:auto;min-height:0;padding:20px 18px 10px;
+  /* The globe's grid again, at a whisper. */
+  background-image:radial-gradient(rgba(24,51,94,.055) 1px,transparent 1px);
+  background-size:24px 24px;
+  scroll-behavior:smooth;
+}
+
+.day{text-align:center;margin:14px 0 16px;animation:msgIn .3s var(--ease-out) both}
+.day span{
+  display:inline-block;padding:4px 13px;border-radius:var(--r-pill);
+  background:rgba(24,51,94,.07);color:var(--tx-2);
+  font-size:11px;font-weight:700;letter-spacing:.04em;
+  backdrop-filter:saturate(1.2);
+}
+
+.msg{display:flex;margin-bottom:9px;animation:msgIn .28s var(--ease-out) both}
+.msg.me{justify-content:flex-end}
+@keyframes msgIn{
+  from{opacity:0;transform:translateY(9px) scale(.985)}
+  to{opacity:1;transform:none}
+}
+
+.bub{
+  position:relative;max-width:min(580px,74%);padding:9px 13px 7px;
+  border-radius:var(--r-lg);
+  background:var(--card);border:1px solid var(--line);box-shadow:var(--e1);
+  word-wrap:break-word;overflow-wrap:anywhere;
+  transition:box-shadow var(--mid) var(--ease);
+}
+/* One squared corner on the side the message came from - the difference
+   between two columns of pills and a conversation with a direction. */
+.msg:not(.me) .bub{border-bottom-left-radius:5px}
+.msg.me .bub{
+  border-bottom-right-radius:5px;
+  background:linear-gradient(160deg,var(--navy-lt) 0%,var(--navy) 62%,#152c53 100%);
+  border-color:transparent;color:#fff;
+  box-shadow:0 1px 2px rgba(15,28,46,.10), 0 8px 20px -12px rgba(24,51,94,.85);
+}
+.bub:hover{box-shadow:var(--e2)}
+.bub p{margin:0;white-space:pre-wrap;font-size:14.5px;line-height:1.5}
+.msg.me .bub a{color:#a9d6ff;text-decoration:underline}
+.bub img.photo{
+  display:block;max-width:100%;width:290px;border-radius:var(--r-sm);cursor:zoom-in;
+  background:#e7ebf1;transition:transform var(--mid) var(--ease), filter var(--mid) var(--ease);
+}
+.bub img.photo:hover{transform:scale(1.012);filter:brightness(1.03)}
+.bub audio{display:block;width:262px;margin:3px 0}
+
+.foot{
+  display:flex;align-items:center;justify-content:flex-end;gap:5px;
+  margin-top:3px;font-size:11px;color:var(--tx-3);font-variant-numeric:tabular-nums;
+}
+.msg.me .foot{color:rgba(255,255,255,.62)}
+.tick{width:17px;height:11px;flex:0 0 auto}
+.tick path{stroke:#a3adbd;stroke-width:2.3;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.msg.me .tick path{stroke:rgba(255,255,255,.6);transition:stroke var(--slow) var(--ease)}
+.msg.me .tick.seen path{stroke:var(--tick)}
+
+.empty{
+  height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:11px;color:var(--tx-3);text-align:center;padding:34px;
+  animation:msgIn .4s var(--ease-out) both;
+}
+.empty .ico{
+  width:76px;height:76px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(150deg,var(--navy-wash),var(--blue-wash));
+  color:var(--navy-lt);margin-bottom:3px;
+  box-shadow:inset 0 0 0 1px rgba(24,51,94,.07);
+}
+.empty b{color:var(--tx-2);font-size:15.5px;font-weight:680}
+.empty span{font-size:13.5px;max-width:330px;line-height:1.6}
+
+/* ---- "Sending 2 of 5 photos…" ------------------------------------------- */
+.send-note{
+  flex:0 0 auto;padding:7px 16px;font-size:12.5px;font-weight:600;color:var(--navy);
+  background:var(--blue-wash);border-top:1px solid #d6e6f8;
+  display:flex;align-items:center;gap:8px;
+}
+.send-note::before{
+  content:"";width:12px;height:12px;border-radius:50%;flex:0 0 auto;
+  border:2px solid rgba(24,51,94,.25);border-top-color:var(--navy);
+  animation:spin .8s linear infinite;
+}
+.send-note[hidden]{display:none!important}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ---- pictures waiting to be sent ---------------------------------------- */
+.tray{
+  flex:0 0 auto;padding:10px 13px;background:var(--card);border-top:1px solid var(--line);
+  display:flex;align-items:center;gap:10px;
+}
+.tray[hidden]{display:none!important}
+.tray-strip{
+  display:flex;gap:8px;overflow-x:auto;padding:2px 0 4px;flex:1;scrollbar-width:thin;
+}
+.tray-item{position:relative;flex:0 0 auto}
+.tray-item img{
+  width:62px;height:62px;object-fit:cover;border-radius:10px;
+  border:1px solid var(--line);background:var(--paper);display:block;
+}
+/* The cross sits ON the picture, as it does everywhere else, and is a full
+   finger's width - taking a wrong photograph out is the whole point of this
+   tray, so it must not be the fiddliest thing on the screen. */
+.tray-item button{
+  position:absolute;top:-6px;right:-6px;width:24px;height:24px;border:0;border-radius:50%;
+  background:rgba(12,22,38,.86);color:#fff;cursor:pointer;line-height:1;font-size:15px;
+  display:flex;align-items:center;justify-content:center;padding:0;
+  box-shadow:0 2px 6px rgba(0,0,0,.3);
+}
+.tray-item button:hover{background:var(--red,#c0392b)}
+.tray-clear{
+  flex:0 0 auto;border:0;background:none;color:var(--tx-2);cursor:pointer;
+  font:inherit;font-size:12.5px;font-weight:600;text-decoration:underline;padding:6px 2px;
+}
+.tray-clear:hover{color:var(--tx)}
+
+/* ---- writing ------------------------------------------------------------ */
+.compose{
+  position:relative;z-index:5;
+  flex:0 0 auto;padding:11px 13px;background:var(--card);border-top:1px solid var(--line);
+  display:flex;align-items:flex-end;gap:9px;
+  box-shadow:0 -6px 18px -16px rgba(15,28,46,.55);
+}
+.compose textarea{
+  flex:1;min-height:46px;max-height:150px;resize:none;padding:12px 15px;
+  font:inherit;font-size:14.5px;line-height:1.45;color:var(--tx);
+  background:var(--paper);border:1.5px solid transparent;border-radius:var(--r-lg);outline:none;
+  transition:background var(--fast) var(--ease), border-color var(--fast) var(--ease),
+             box-shadow var(--fast) var(--ease);
+}
+.compose textarea::placeholder{color:#a3aebe}
+.compose textarea:focus{
+  background:var(--card);border-color:var(--blue);box-shadow:0 0 0 4px var(--blue-wash);
+}
+
+.tool{
+  flex:0 0 auto;width:46px;height:46px;border:0;border-radius:50%;cursor:pointer;
+  background:var(--paper);color:var(--tx-2);
+  display:flex;align-items:center;justify-content:center;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease),
+             transform var(--fast) var(--ease), box-shadow var(--mid) var(--ease);
+}
+.tool:hover{background:#e7ecf4;color:var(--navy)}
+.tool:active{transform:scale(.93)}
+.tool.send{
+  background:linear-gradient(160deg,var(--blue-lt),var(--blue) 55%,var(--blue-dk));
+  color:#fff;box-shadow:0 3px 10px -3px rgba(3,112,205,.75);
+}
+.tool.send:hover{
+  background:linear-gradient(160deg,var(--blue-lt),var(--blue) 55%,var(--blue-dk));
+  transform:translateY(-1px);box-shadow:0 6px 16px -4px rgba(3,112,205,.8);
+}
+.tool.send:active{transform:scale(.93) translateY(0)}
+.tool.send svg{transition:transform var(--mid) var(--ease)}
+.tool.send:hover svg{transform:translateX(1.5px) rotate(4deg)}
+.tool.rec{background:var(--red-wash);color:var(--red)}
+.tool[disabled]{opacity:.45;cursor:default;transform:none}
+
+.rec-bar{
+  display:none;align-items:center;gap:11px;flex:1;height:46px;padding:0 16px;
+  background:var(--red-wash);border-radius:var(--r-lg);color:var(--red-dk);
+  font-weight:660;font-size:14px;
+}
+.rec-bar.on{display:flex;animation:msgIn .22s var(--ease-out) both}
+.blip{
+  width:10px;height:10px;border-radius:50%;background:var(--red);flex:0 0 auto;
+  animation:blip 1.15s ease-in-out infinite;
+}
+@keyframes blip{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.28;transform:scale(.82)}}
+
+/* ---- emoji -------------------------------------------------------------- */
+.emoji{
+  position:absolute;bottom:70px;left:13px;width:304px;max-height:244px;overflow-y:auto;
+  background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);
+  box-shadow:var(--e3);padding:9px;z-index:30;
+  display:none;transform-origin:bottom left;
+}
+.emoji.on{display:block;animation:padIn .2s var(--ease-out) both}
+@keyframes padIn{
+  from{opacity:0;transform:translateY(8px) scale(.94)}
+  to{opacity:1;transform:none}
+}
+.emoji button{
+  width:35px;height:35px;border:0;background:transparent;cursor:pointer;font-size:20px;
+  border-radius:var(--r-xs);line-height:1;
+  transition:background var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.emoji button:hover{background:var(--navy-wash);transform:scale(1.16)}
+.emoji button:active{transform:scale(.94)}
+.wrap-rel{position:relative}
+
+/* ---- the picture, opened ------------------------------------------------ */
+.lb{
+  position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+  background:rgba(8,18,34,.80);padding:30px;backdrop-filter:blur(3px);
+}
+.lb.on{display:flex;animation:fadeIn .18s var(--ease-out) both}
+.lb img{
+  max-width:100%;max-height:100%;border-radius:var(--r);box-shadow:0 30px 90px rgba(0,0,0,.6);
+  animation:zoomIn .26s var(--ease-out) both;
+  user-select:none;-webkit-user-drag:none;
+}
+/* Walking through the conversation's pictures. The arrows are large and sit
+   clear of the picture; on a phone there is a swipe as well, because that is
+   the gesture a thumb already knows. */
+.lb-nav,.lb-x{
+  position:absolute;border:0;cursor:pointer;color:#fff;padding:0;
+  background:rgba(255,255,255,.14);backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;
+  transition:background var(--fast) var(--ease), transform var(--fast) var(--ease);
+}
+.lb-nav{top:50%;width:52px;height:52px;border-radius:50%;margin-top:-26px}
+.lb-nav:hover,.lb-x:hover{background:rgba(255,255,255,.28)}
+.lb-nav:active{transform:scale(.94)}
+.lb-prev{left:16px}
+.lb-next{right:16px}
+.lb-x{top:16px;right:16px;width:44px;height:44px;border-radius:50%}
+.lb-nav[hidden]{display:none!important}
+.lb-count{
+  position:absolute;top:22px;left:50%;transform:translateX(-50%);
+  color:rgba(255,255,255,.9);font-size:13px;font-weight:600;letter-spacing:.03em;
+  background:rgba(8,18,34,.5);padding:5px 12px;border-radius:100px;
+}
+.lb-count[hidden]{display:none!important}
+@media (max-width:860px){
+  .lb{padding:16px}
+  .lb-nav{width:44px;height:44px;margin-top:-22px}
+  .lb-prev{left:6px}
+  .lb-next{right:6px}
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes zoomIn{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+
+/* ---- narrow screens: one panel at a time, as a phone does it ------------ */
+.back-btn{display:none}
+@media (max-width:860px){
+  .top{height:60px;flex:0 0 60px;padding:0 12px;gap:10px}
+  .top .mark{height:36px;padding:0 9px}
+  .top .mark img{height:21px}
+  .side{width:100%;flex:1 1 auto;box-shadow:none}
+  .body.has-thread .side{display:none}
+  .pane{display:none}
+  .body.has-thread .pane{display:flex}
+  .pane-head{height:58px;flex:0 0 58px;padding:0 10px}
+  .back-btn{display:inline-flex}
+  .scroll{padding:16px 12px 8px}
+  .bub{max-width:86%}
+  .bub img.photo{width:min(270px,68vw)}
+  .compose{padding:9px 10px;gap:7px}
+  .tool{width:44px;height:44px}
+  .emoji{left:10px;right:10px;width:auto}
+}
+@media (max-width:400px){
+  .top .who{display:none}
+  .compose textarea{padding:11px 13px}
+}
+
+/* ---- calls ---------------------------------------------------------------
+
+   The two buttons in the conversation's header, and the screen a call lives on.
+   The screen covers the conversation rather than replacing it, so when the call
+   is over the messages are exactly where they were left. Brand colours only:
+   navy behind, the mark's red to hang up, and green — which in this app means
+   one thing, "somebody is there" — to answer. */
+.pane{position:relative}
+.call-btns{margin-left:auto;display:flex;gap:6px}
+.call-go{width:40px;height:40px;background:var(--navy-wash);color:var(--navy)}
+.call-go:hover{background:#dfe7f4;color:var(--navy-dk)}
+.call-go[disabled]{opacity:.38;cursor:not-allowed;background:var(--paper)}
+
+/* FIXED to the window, not absolute inside the conversation pane. In the
+   website's narrow panel the pane is hidden while the list is showing, so a call
+   arriving then rang out of a screen nobody could see. A call covers the whole
+   window, the way a phone's does. */
+.call{
+  position:fixed;inset:0;z-index:100;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  color:#fff;
+  background:
+    radial-gradient(620px 360px at 50% 18%, rgba(3,112,205,.30), transparent 62%),
+    linear-gradient(170deg,var(--navy-lt) -10%,var(--navy) 42%,var(--navy-dk) 100%);
+  animation:fadeIn .22s var(--ease-out) both;
+}
+.call-remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000;display:none}
+.call-local{
+  position:absolute;right:14px;bottom:104px;width:118px;height:160px;object-fit:cover;
+  border-radius:var(--r);background:#111;display:none;z-index:2;
+  box-shadow:0 10px 26px -8px rgba(0,0,0,.6),0 0 0 2px rgba(255,255,255,.18);
+  transform:scaleX(-1);                       /* a mirror, the way a selfie camera shows you */
+}
+.call.has-video .call-remote,
+.call.has-video .call-local{display:block}
+
+.call-card{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;gap:6px;
+  text-align:center;padding:0 24px;transition:transform var(--slow) var(--ease)}
+.call.has-video .call-card{
+  position:absolute;top:18px;left:0;right:0;transform:none;
+  text-shadow:0 1px 6px rgba(0,0,0,.55);
+}
+.call.has-video .call-card .call-av{display:none}
+.call-av{width:92px;height:92px;font-size:28px;margin-bottom:8px;
+  box-shadow:0 0 0 4px rgba(255,255,255,.14),0 16px 34px -12px rgba(0,0,0,.6)}
+.call-card b{font-size:21px;font-weight:700;letter-spacing:-.2px}
+.call-card span{font-size:14px;color:#b9cbe4;font-variant-numeric:tabular-nums}
+/* Ringing, either way: the face breathes, the way a phone's screen does. */
+.call.ringing .call-av{animation:ringHalo 1.6s var(--ease-out) infinite}
+@keyframes ringHalo{
+  0%{box-shadow:0 0 0 0 rgba(255,255,255,.35),0 16px 34px -12px rgba(0,0,0,.6)}
+  70%,100%{box-shadow:0 0 0 22px rgba(255,255,255,0),0 16px 34px -12px rgba(0,0,0,.6)}
+}
+
+.call-bar{
+  position:absolute;bottom:26px;left:0;right:0;z-index:3;
+  display:flex;justify-content:center;gap:18px;
+}
+.cbtn{
+  width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.16);color:#fff;
+  backdrop-filter:blur(6px);
+  transition:background var(--fast) var(--ease),transform var(--fast) var(--ease);
+}
+.cbtn:hover{background:rgba(255,255,255,.26)}
+.cbtn:active{transform:scale(.92)}
+.cbtn.off{background:#fff;color:var(--navy)}          /* muted / camera off */
+.cbtn-end{background:var(--red);box-shadow:0 8px 20px -6px rgba(188,30,45,.8)}
+.cbtn-end:hover{background:var(--red-lt)}
+.cbtn-yes{background:var(--live);box-shadow:0 8px 20px -6px rgba(18,161,80,.8);
+  animation:answerNudge 1.3s ease-in-out infinite}
+.cbtn-yes:hover{background:#14b85b}
+@keyframes answerNudge{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+
+/* The line a call leaves in the conversation. */
+.bub.callog{display:flex;align-items:center;gap:10px;padding:10px 13px 8px}
+.bub.callog .ci{
+  flex:0 0 auto;width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;background:var(--navy-wash);color:var(--navy);
+}
+.msg.me .bub.callog .ci{background:rgba(255,255,255,.16);color:#fff}
+.bub.callog.missed .ci{background:var(--red-wash);color:var(--red)}
+.bub.callog p{font-weight:600}
+.bub.callog small{display:block;font-size:12px;opacity:.72;margin-top:1px;font-weight:400}
+
+/* ---- inside the website's own panel --------------------------------------
+
+   The chat now opens as a panel on sbkautotrading.com, and that panel already
+   has a bar of its own with the logo, the name and a close button. Showing this
+   app's bar underneath it would be two headers stacked, which is the single
+   fastest way to make something look bolted on.
+
+   Everything else is left alone on purpose: the panel is about 404px wide, so
+   the phone layout further up has already taken over — one column at a time,
+   with the back arrow — which is exactly right for a panel in a corner. */
+html.framed .top{display:none}
+html.framed .gate{padding:14px}
+html.framed .gate-card{max-width:100%;border-radius:14px}
+html.framed .gate-head{padding:24px 22px 16px}
+html.framed .gate-head img{height:42px;margin-bottom:14px}
+html.framed .gate-head h1{font-size:19px}
+html.framed .gate-body{padding:4px 22px 24px}
+
+/* ---- anybody who has asked their machine for less movement -------------- */
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{
+    animation-duration:.001ms!important;animation-iteration-count:1!important;
+    transition-duration:.001ms!important;scroll-behavior:auto!important;
+  }
+}
+
+/* ---- phones: reachable --------------------------------------------------
+   From the same measured sweep as the portal (sbk-tools/responsivecheck.py,
+   nine widths from a 360px phone upwards, 15 September 2026). Nothing here
+   scrolled sideways and nothing was too small to read; the one thing under a
+   thumb's reach was "Sign in on the website", 16px tall inside a sentence.
+   Vertical padding on an INLINE element grows where a finger lands without
+   changing the line box, so the sentence reads exactly as it did. */
+@media (max-width:480px){
+  p a, .gate-note a, .hint a, label a{ padding-block:7px; }
+}
+
+/* ================================================================== groups
+   The owner's ask, 2026-09-16: groups "like WhatsApp". A room sits in the same
+   list as the conversations and opens in the same pane, so almost nothing new
+   is needed here - only the plus that makes one, the face that tells a room
+   from a person, the name above a bubble in a crowd, and the little box. */
+
+/* The plus lives beside the heading without being inside it: chat.js rewrites
+   that heading's text for an administrator stepping in and out of an agent,
+   and a child of it would be rewritten away. */
+.side-new{
+  position:absolute;top:9px;right:12px;width:28px;height:28px;
+  display:inline-flex;align-items:center;justify-content:center;
+  border:0;border-radius:50%;background:var(--navy-wash);color:var(--navy);
+  cursor:pointer;z-index:2;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.side-new:hover{background:var(--navy);color:#fff}
+.side-new:focus-visible{outline:2px solid var(--navy-lt);outline-offset:2px}
+
+/* A room is not a person, and the corner says so before the name is read. */
+.av.is-gav{border-radius:34%}
+
+/* Who is speaking, in a room of six. Never on your own bubble - you know. */
+.gwho{
+  display:block;margin:0 0 3px;font-size:12px;font-weight:750;letter-spacing:.01em;
+}
+.msg.me .gwho{display:none}
+
+/* Standing in a group, the name at the top is the way into it. */
+.in-group .head-who{cursor:pointer}
+
+/* ---- the little box: built when it is wanted, gone when it is closed ---- */
+.gdlg{
+  position:fixed;inset:0;z-index:90;padding:18px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(9,18,34,.52);animation:fadeIn .16s var(--ease-out) both;
+}
+.gdlg-box{
+  width:min(420px,100%);max-height:min(86vh,680px);
+  display:flex;flex-direction:column;overflow:hidden;
+  background:var(--card);border-radius:var(--r-lg);box-shadow:var(--e4);
+  animation:zoomIn .2s var(--ease-out) both;
+}
+.gdlg-top{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 16px;border-bottom:1px solid var(--line-2);
+}
+.gdlg-top b{
+  flex:1;min-width:0;font-size:15px;font-weight:750;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.gdlg-x{
+  flex:0 0 auto;width:30px;height:30px;border:0;border-radius:50%;
+  background:transparent;color:var(--tx-3);font-size:23px;line-height:1;cursor:pointer;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.gdlg-x:hover{background:var(--paper);color:var(--tx)}
+.gdlg-body{padding:14px 16px 16px;overflow-y:auto}
+
+.gname{
+  width:100%;padding:10px 12px;font:inherit;font-size:14px;color:var(--tx);
+  background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);
+}
+.gname:focus{outline:none;border-color:var(--navy-lt);background:var(--card)}
+.grow{display:flex;align-items:center;gap:8px}
+
+.gpick-h{
+  margin:15px 0 8px;font-size:11px;font-weight:780;letter-spacing:.13em;
+  text-transform:uppercase;color:var(--tx-3);
+}
+.gpick-list,.gmem-list{margin:0 -6px}
+/* Short enough that the button under the list is never below the fold: a
+   dialog whose action you have to go looking for reads as a broken dialog. */
+.gpick-list{max-height:min(34vh,232px);overflow-y:auto}
+.gpick,.gmem{
+  display:flex;align-items:center;gap:10px;padding:7px 6px;border-radius:var(--r-sm);
+}
+.gpick{cursor:pointer}
+.gpick:hover,.gmem:hover{background:var(--paper)}
+.gpick input{flex:0 0 auto;width:17px;height:17px;accent-color:var(--navy);cursor:pointer}
+.gpick-nm{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.25}
+.gpick-nm b{
+  font-size:13.5px;font-weight:650;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.gpick-nm span{font-size:11.5px;color:var(--tx-3)}
+.gpick-on{flex:0 0 auto;font-size:11px;font-style:normal;font-weight:650;color:#1f9254}
+.gmem-x{
+  flex:0 0 auto;width:30px;height:30px;border:0;border-radius:50%;
+  background:transparent;color:var(--tx-3);font-size:19px;line-height:1;cursor:pointer;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.gmem-x:hover{background:var(--red-wash);color:var(--red)}
+
+.gdlg-do{margin-top:14px;display:flex;justify-content:flex-end}
+.gbtn{
+  border:0;border-radius:var(--r-sm);padding:10px 16px;
+  font:inherit;font-size:13.5px;font-weight:700;
+  background:var(--navy);color:#fff;cursor:pointer;
+  transition:background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+.gbtn:hover{background:var(--navy-dk)}
+.gbtn:disabled{opacity:.55;cursor:default}
+.gbtn-thin{flex:0 0 auto;padding:10px 14px}
+.gbtn-out{background:var(--red-wash);color:var(--red)}
+.gbtn-out:hover{background:var(--red);color:#fff}
+.gnote{margin:0;font-size:13px;color:var(--tx-3)}
+
+/* On a phone the box uses the width it is given and nothing hangs off the
+   edge - the owner's rule is that nothing, however small, breaks. */
+@media (max-width:480px){
+  .gdlg{padding:12px}
+  .gdlg-body{padding:12px 13px 14px}
+  .gpick-list{max-height:40vh}
+  .gdlg-do{justify-content:stretch}
+  .gdlg-do .gbtn{flex:1}
+  .grow .gbtn-thin{flex:0 0 auto}
+}

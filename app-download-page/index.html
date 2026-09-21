@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>SBK Chat — Android app</title>
+<style>
+  :root {
+    --navy: #18335E;
+    --navy-dark: #0E1F3D;
+    --red: #BC1E2D;
+    --paper: #F4F6F9;
+    --ink: #101828;
+    --ink2: #54617A;
+    --line: #E4E8EF;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.55 -apple-system, "Segoe UI", Roboto, system-ui, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 0 16px 48px;
+  }
+  .sheet { width: 100%; max-width: 460px; }
+  header {
+    background: linear-gradient(160deg, #2A4C82 0%, var(--navy) 55%, var(--navy-dark) 100%);
+    margin: 0 -16px 22px;
+    padding: 34px 24px 30px;
+    text-align: center;
+    color: #fff;
+  }
+  header img { height: 62px; width: auto; }
+  header h1 { margin: 16px 0 4px; font-size: 24px; font-weight: 800; letter-spacing: .2px; }
+  header p { margin: 0; color: #C9D5E6; font-size: 14px; }
+  .card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .row { display: flex; justify-content: space-between; padding: 7px 0; font-size: 14px; }
+  .row + .row { border-top: 1px solid #EEF1F6; }
+  .row span { color: var(--ink2); }
+  .row b { font-weight: 700; font-variant-numeric: tabular-nums; }
+  a.get {
+    display: block;
+    background: var(--navy);
+    color: #fff;
+    text-decoration: none;
+    text-align: center;
+    font-size: 17px;
+    font-weight: 700;
+    padding: 16px;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(24, 51, 94, .25);
+  }
+  a.get:active { background: var(--navy-dark); }
+  h2 { font-size: 15px; margin: 0 0 10px; letter-spacing: .3px; text-transform: uppercase; color: var(--ink2); }
+  ol { margin: 0; padding-left: 20px; }
+  ol li { margin-bottom: 8px; font-size: 14.5px; }
+  .note { font-size: 13px; color: var(--ink2); margin-top: 14px; }
+  .bar { height: 3px; background: var(--red); border-radius: 2px; width: 42px; margin: 0 auto 14px; }
+  footer { text-align: center; color: var(--ink2); font-size: 12.5px; margin-top: 26px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header>
+    <img src="sbk-mark.png" alt="SBK Global Auto Trading">
+    <h1>SBK Chat</h1>
+    <p>The same chat as the website, on your phone</p>
+  </header>
+
+  <a class="get" href="SBK-Chat.apk?v=1.0.9" download="SBK-Chat.apk">Download for Android</a>
+
+  <div class="card" style="margin-top:16px">
+    <div class="row"><span>Version</span><b>1.0.9</b></div>
+    <div class="row"><span>Size</span><b>59 MB</b></div>
+    <div class="row"><span>Needs</span><b>Android 7 or newer</b></div>
+  </div>
+
+  <div class="card">
+    <div class="bar"></div>
+    <h2>How to install</h2>
+    <ol>
+      <li>Tap <b>Download for Android</b> above.</li>
+      <li>Open the downloaded file. If the phone asks, allow installing from this browser.</li>
+      <li>Install, open, and sign in with your website account.</li>
+    </ol>
+    <p class="note">Phone par wahi account chalega jo website par hai. Nayi APK aane par yehi safha
+      kholein aur dobara download kar ke upar install kar lein.</p>
+  </div>
+
+  <footer>SBK Global Auto Trading</footer>
+
+</div>
+</body>
+</html>
