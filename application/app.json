@@ -1,0 +1,88 @@
+{
+  "expo": {
+    "name": "SBK Chat",
+    "slug": "sbk-chat",
+    "version": "1.0.9",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F4F6F9",
+    "primaryColor": "#18335E",
+    "splash": {
+      "backgroundColor": "#18335E",
+      "resizeMode": "contain",
+      "image": "./assets/splash-icon.png"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sbkautotrading.chat",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Used for voice notes and calls you choose to make or answer in a chat.",
+        "NSPhotoLibraryUsageDescription": "Used to pick a picture you choose to send in a chat.",
+        "NSCameraUsageDescription": "Used for video calls you choose to make or answer in a chat."
+      }
+    },
+    "android": {
+      "package": "com.sbkautotrading.chat",
+      "versionCode": 9,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "INTERNET",
+        "RECORD_AUDIO",
+        "READ_MEDIA_IMAGES",
+        "READ_EXTERNAL_STORAGE",
+        "CAMERA",
+        "MODIFY_AUDIO_SETTINGS",
+        "VIBRATE",
+        "WAKE_LOCK",
+        "BLUETOOTH_CONNECT",
+        "ACCESS_NETWORK_STATE",
+        "POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow SBK Chat to access your photos to send a picture."
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow SBK Chat to use your microphone to record a voice note."
+        }
+      ],
+      [
+        "@config-plugins/react-native-webrtc",
+        {
+          "cameraPermission": "Allow SBK Chat to use your camera for video calls.",
+          "microphonePermission": "Allow SBK Chat to use your microphone for calls and voice notes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#18335E",
+          "defaultChannel": "messages",
+          "sounds": [
+            "./assets/ring.ogg"
+          ]
+        }
+      ],
+      "./plugins/withLowMemoryBuild",
+      "./plugins/withSafeNative"
+    ]
+  }
+}

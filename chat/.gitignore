@@ -1,0 +1,10 @@
+# Secrets — never committed. The database and WordPress credentials are read at
+# run time from the auction site's .env and from wp-config.php on the server.
+.env
+.env.local
+*.keep
+
+# Runtime
+error_log
+*.log
+media/

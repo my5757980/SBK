@@ -1,0 +1,49 @@
+# SBK Auction — web server rules
+#
+# The project root is also the document root on shared hosting, so anything
+# that is not meant to be served has to be denied explicitly.
+
+# ---------------------------------------------------------------------------
+# Never serve secrets, source of the sync worker, docs or VCS data
+# ---------------------------------------------------------------------------
+<FilesMatch "^\.env|^\.git|\.(py|pyc|log|out|md|sql|sh|ini|bak)$">
+    Require all denied
+</FilesMatch>
+
+RedirectMatch 404 /\.git
+RedirectMatch 404 /\.venv
+RedirectMatch 404 /_archive
+RedirectMatch 404 /__pycache__
+RedirectMatch 404 /specs/
+RedirectMatch 404 /history/
+RedirectMatch 404 /\.specify/
+
+# ---------------------------------------------------------------------------
+# Directory listings off
+# ---------------------------------------------------------------------------
+Options -Indexes
+
+# ---------------------------------------------------------------------------
+# Default document
+# ---------------------------------------------------------------------------
+DirectoryIndex index.php index.html
+
+# ---------------------------------------------------------------------------
+# Basic hardening
+# ---------------------------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ---------------------------------------------------------------------------
+# Cache static assets (they are cache-busted with ?v= when they change)
+# ---------------------------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css            "access plus 30 days"
+    ExpiresByType application/javascript "access plus 30 days"
+    ExpiresByType image/jpeg          "access plus 30 days"
+    ExpiresByType image/png           "access plus 30 days"
+</IfModule>

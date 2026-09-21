@@ -1,0 +1,9 @@
+# The application's own domain: the Android app's own page, and the chat's
+# functionality the app talks to (api/ and media.php, one-line loaders of the
+# chat's own files). What people SEE here is the application's page - the
+# website chat's pages are not served from this domain (owner, 19 Sep 2026:
+# "application ki UI/UX same rahegi, sirf functionality chat jaisi").
+DirectoryIndex index.html
+
+# The download page's address given out earlier the same day.
+RedirectMatch 302 ^/app/?$ /
