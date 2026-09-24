@@ -14,6 +14,7 @@
 
 require_once 'includes/config.php';
 require_once 'includes/functions.php';
+require_once 'includes/statistics-lib.php';
 
 requireLogin();
 
@@ -73,9 +74,9 @@ if ($months !== '') {
 if (ctype_digit($y1)) { $where[] = 'year >= ?'; $params[] = (int) $y1; $types .= 'i'; }
 if (ctype_digit($y2)) { $where[] = 'year <= ?'; $params[] = (int) $y2; $types .= 'i'; }
 if ($result === 'sold') {
-    $where[] = "(result IS NULL OR result NOT LIKE '%not%')";
+    $where[] = STAT_SOLD_SQL;
 } elseif ($result === 'unsold') {
-    $where[] = "result LIKE '%not%'";
+    $where[] = STAT_UNSOLD_SQL;
 }
 $where_sql = implode(' AND ', $where);
 
@@ -106,7 +107,7 @@ if (isset($_GET['count'])) {
         $st = $conn->prepare(
             "SELECT COUNT(*) n, AVG(final_price) a FROM car_stats
               WHERE $where_sql AND final_price > 0
-                AND (result IS NULL OR result NOT LIKE '%not%')");
+                AND " . STAT_SOLD_SQL . "");
         if ($st) {
             if ($params) { $st->bind_param($types, ...$params); }
             $st->execute();
@@ -142,7 +143,7 @@ if ($haveTable) {
     $st = $conn->prepare(
         "SELECT COUNT(*) n, AVG(final_price) a FROM car_stats
           WHERE $where_sql AND final_price > 0
-            AND (result IS NULL OR result NOT LIKE '%not%')");
+            AND " . STAT_SOLD_SQL . "");
     if ($st) {
         if ($params) { $st->bind_param($types, ...$params); }
         $st->execute();
@@ -193,70 +194,23 @@ function stQs($over = array()) {
     return 'statistics.php' . ($a ? '?' . http_build_query($a) : '');
 }
 
-/**
- * The photographs of a past sale: array('thumb' => url, 'full' => url) or null.
- *
- * The source stores three picture tokens per lot and serves them from its own
- * image host. It refuses DATACENTRE addresses - this server, GitHub, any VPS -
- * which is why the photographs cannot be fetched or copied here; but it serves
- * an ordinary home or mobile connection with **no login, no referer and no
- * cookie at all** (measured 15 September 2026, including tokens stored the day
- * before and sales from July). The customer's browser is on exactly such a
- * connection, so the page hands it the address and it collects the picture
- * itself - the same arrangement the auction list already has with its own
- * picture host.
- *
- * Only `&h=50` is honoured for a smaller copy (66x50); every other height comes
- * back as 32 bytes of nothing. So: the thumbnail is h=50 and the full picture is
- * the bare address, 640x480.
- *
- * ALL of a lot's pictures are returned, and the cell puts them in a `.lot-shots`
- * strip - the same wrapper the auction list uses - because that is what tells the
- * lightbox which pictures belong together. Showing only the first, with the strip
- * missing, made the set fall back to the whole `tbody`: clicking one car opened
- * "1 / 30" and the arrows walked through every other row on the page.
- */
-function statPhotos($row) {
-    $t = $row['photos'] ?? '';
-    if (is_string($t)) {
-        $t = json_decode($t, true) ?: array();
-    }
-    /* THE SAME PICTURE IS NOT TWO PICTURES.
-       For some halls the source gives the same token twice - on 17 September
-       2026 ten of the thirty lots on the first page did, all from Aux Mobility.
-       Three tiles were drawn, two of them identical, and the viewer counted
-       "1 / 3" and then showed the same photograph again when the reader stepped
-       forward. The owner read that as the arrows being broken; the arrows were
-       fine, there was simply nothing new to show.
-       Dropped here as well as at ingest, because this puts the nine hundred
-       thousand rows already stored right immediately, without waiting for each
-       one to be read again. */
-    $out  = array();
-    $seen = array();
-    foreach ((is_array($t) ? $t : array()) as $tok) {
-        $tok = trim((string) $tok);
-        if ($tok === '' || !preg_match('/^[A-Za-z0-9_-]{8,}$/', $tok)) {
-            continue;
-        }
-        if (isset($seen[$tok])) {
-            continue;
-        }
-        $seen[$tok] = true;
-        $base = 'https://8.ajes.com/imgs/' . rawurlencode($tok);
-        $out[] = array('thumb' => $base . '&h=50', 'full' => $base);
-    }
-    return $out;
-}
+// statPhotos(), stOutcome() and stSold() live in includes/statistics-lib.php,
+// which statistics-detail.php shares.
 
-/** A result the source calls "not sold" is a bid that was refused. */
-function stSold($row) {
-    $r = strtolower(trim((string) ($row['result'] ?? '')));
-    return $r === '' || strpos($r, 'not') === false;
+/** A sale's own page. It carries the list's filters and page, so "Back" on the
+    detail returns the reader to exactly the rows they came from. */
+function stDetailHref($c) {
+    $back = substr(stQs(), strlen('statistics.php'));
+    return 'statistics-detail.php?id=' . rawurlencode($c['stat_id'])
+         . ($back !== '' ? '&back=' . rawurlencode(ltrim($back, '?')) : '');
 }
 
 $page_title = 'Statistics — ' . SITE_NAME;
 require_once 'includes/header.php';
 ?>
+<?php // The Statistics pages' own styles - a separate file, so nothing the auction
+      // loads is touched by them. ?>
+<link rel="stylesheet" href="<?php echo assetV('assets/css/stats.css'); ?>">
 
 <div class="container">
   <nav class="crumbs">
@@ -388,8 +342,11 @@ require_once 'includes/header.php';
           </tr>
         </thead>
         <tbody>
-          <?php foreach ($rows as $c): $sold = stSold($c); $pics = statPhotos($c); ?>
-            <tr>
+          <?php foreach ($rows as $c): $out = stOutcome($c); $sold = $out['sold']; $pics = statPhotos($c); $href = stDetailHref($c); ?>
+            <?php // The whole row opens the sale's own page (the owner, 24 September
+                  // 2026: "the detail page isn't showing up"); the photographs keep
+                  // their own click, which enlarges them. See stats.css / below. ?>
+            <tr class="st-row" data-href="<?php echo sanitize($href); ?>">
               <td class="c-shot">
                 <?php if ($pics): ?>
                   <?php // The strip is what groups them: the lightbox opens the
@@ -414,7 +371,7 @@ require_once 'includes/header.php';
               </td>
               <td><?php echo sanitize($c['lot_no']); ?></td>
               <td>
-                <b><?php echo sanitize(trim($c['maker'] . ' ' . $c['model'])); ?></b>
+                <a class="st-open" href="<?php echo sanitize($href); ?>"><b><?php echo sanitize(trim($c['maker'] . ' ' . $c['model'])); ?></b></a>
                 <span class="sub"><?php echo $c['year'] ? (int) $c['year'] : '—'; ?></span>
               </td>
               <td>
@@ -447,12 +404,12 @@ require_once 'includes/header.php';
                 <?php if ($c['final_price']): ?>
                   <b class="<?php echo $sold ? 'st-sold' : 'st-unsold'; ?>">&yen;<?php
                     echo number_format($c['final_price']); ?></b>
-                  <?php if (!$sold): ?><span class="sub">highest bid</span><?php endif; ?>
+                  <?php if (!$sold): ?><span class="sub"><?php echo $out['key'] === 'unsold' ? 'highest bid' : sanitize(strtolower($out['label'])); ?></span><?php endif; ?>
                 <?php else: ?>—<?php endif; ?>
               </td>
               <td class="c-result">
-                <span class="<?php echo $sold ? 'pill pill-sold' : 'pill pill-gone'; ?>">
-                  <?php echo $sold ? 'Sold' : 'Not sold'; ?>
+                <span class="pill <?php echo $sold ? 'pill-sold' : ($out['key'] === 'unsold' ? 'pill-gone' : 'pill-other'); ?>">
+                  <?php echo sanitize($out['short']); ?>
                 </span>
               </td>
             </tr>
@@ -576,6 +533,20 @@ require_once 'includes/header.php';
     setInterval(function () { if (!document.hidden) { tick(); } }, EVERY);
   }, EVERY - (Date.now() % EVERY));
 })();
+</script>
+
+<?php // A click anywhere on a row opens that sale - except on a photograph, a
+      // link or a button, which keep their own job. Delegated from the document
+      // because the live refresh replaces the whole table. ?>
+<script>
+document.addEventListener('click', function (ev) {
+  var t = ev.target;
+  if (!t.closest || t.closest('a, button, img, input, select, .lot-shots')) { return; }
+  var row = t.closest('tr.st-row[data-href]');
+  if (!row) { return; }
+  if (ev.ctrlKey || ev.metaKey) { window.open(row.getAttribute('data-href'), '_blank'); return; }
+  window.location.href = row.getAttribute('data-href');
+});
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
