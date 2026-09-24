@@ -100,17 +100,54 @@ $types  = '';
 if ($maker !== '') { $where[] = 'maker = ?';   $params[] = $maker; $types .= 's'; }
 if ($hall  !== '') { $where[] = 'auction = ?'; $params[] = $hall;  $types .= 's'; }
 if ($model !== '') {
-    $where[]  = 'model LIKE ?';
-    $params[] = '%' . $model . '%';
+    // The model's NAME - "prius", "Prius Alpha" - and a buyer who types the maker
+    // with it ("toyota prius") is still understood.
+    $where[]  = "CONCAT(maker, ' ', model) LIKE ?";
+    $params[] = '%' . preg_replace('/\s+/', ' ', $model) . '%';
     $types   .= 's';
 }
 if ($chas !== '') {
-    // A chassis is given either whole (ZN8-0012345) or as the code alone (ZN8),
-    // and a buyer types whichever they are holding. Both have to find the car.
-    $where[]  = '(chassis LIKE ? OR ? LIKE CONCAT(chassis, \'%\'))';
-    $params[] = '%' . $chas . '%';
-    $params[] = $chas;
-    $types   .= 'ss';
+    /* A chassis the way a buyer holds it: the model code alone (S321V), the whole
+       number (S321V-0123456, with or without the dash, any case), or with the
+       type-approval prefix in front (EBD-S321V-0123456). The source stores the CODE
+       - bare for most lots, prefixed (EBD-S321V) for some - so the typed text is
+       read with the portal's own chassisParts() and matched three ways.
+
+       Until 24 September 2026 this was "code LIKE typed OR typed LIKE code%", and
+       an EMPTY stored code satisfies the second half for anything typed: every
+       chassis-number search also returned the 6,576 lots with no chassis at all,
+       and a prefixed code (EBD-S321V) was never found from its number. */
+    $typed = strtoupper(preg_replace('/\s+/', '', $chas));
+    list($code, $serial) = chassisParts($chas);
+    $or = array('chassis LIKE ?');                               // a code, or part of one
+    $params[] = '%' . $typed . '%';
+    $types   .= 's';
+    if ($code !== '' && strlen($code) >= 2) {                    // the code read out of it, prefix or not
+        $or[] = '(chassis = ? OR chassis LIKE ?)';
+        $params[] = $code;
+        $params[] = '%-' . $code;
+        $types   .= 'ss';
+    }
+    /* A whole number typed WITHOUT a dash (S321V0123456, NHP101234567) cannot be
+       split for certain - a code can end in digits too - so every split that leaves
+       a serial of 4 to 8 digits is tried as the code: S321V | 0123456, NHP10 |
+       1234567 (and NHP1 | 01234567, which no car has). "The code anywhere inside
+       it" (the portal's chassisNumberSql) was tried first and pulled in KH-012 from
+       the serial, HP10 from NHP10 and DA1 from DA17V; "starts with" still took a
+       lot stored as "---". With a dash, the exact code above is already the answer. */
+    if ($serial === '' && preg_match('/^(.*[A-Z])(\d{4,})$/', $code, $m)) {
+        $cands = array();
+        for ($k = 0; $k <= strlen($m[2]); $k++) {
+            $rest = strlen($m[2]) - $k;
+            if ($rest >= 4 && $rest <= 8) { $cands[] = $m[1] . substr($m[2], 0, $k); }
+        }
+        if ($cands) {
+            $in = implode(',', array_fill(0, count($cands), '?'));
+            $or[] = "(REPLACE(chassis, '-', '') IN ($in) OR SUBSTRING_INDEX(chassis, '-', -1) IN ($in))";
+            foreach (array_merge($cands, $cands) as $cd) { $params[] = $cd; $types .= 's'; }
+        }
+    }
+    $where[] = '(' . implode(' OR ', $or) . ')';
 }
 /* The auction DATE, which is not the car's year just below - `sold_on` is
    indexed, so this stays a range scan rather than a walk over the lot. The
@@ -403,14 +440,14 @@ require_once 'includes/header.php';
         </option>
       <?php endforeach; ?>
     </select>
-    <input type="text" name="model" class="input" placeholder="model"
+    <input type="text" name="model" class="input" placeholder="model name (e.g. Prius)"
            value="<?php echo sanitize($model); ?>" style="min-width:150px">
-    <input type="text" name="chassis" class="input" placeholder="chassis"
+    <input type="text" name="chassis" class="input" placeholder="chassis no. / model code"
            value="<?php echo sanitize($chas); ?>" style="min-width:130px">
     <?php // The halls moved into the advanced search, grouped by weekday and
           // several at once, as the source lays them out. Its place here is the
           // source's lot-number box - one lot, or several with commas. ?>
-    <input type="text" name="lot" class="input" placeholder="lot number(s)"
+    <input type="text" name="lot" class="input" placeholder="lot no. (1234, 5678)"
            value="<?php echo sanitize($lot); ?>" style="min-width:130px">
     <input type="text" name="y1" class="input" placeholder="year from"
            value="<?php echo sanitize($y1); ?>" style="width:92px">
