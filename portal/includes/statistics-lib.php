@@ -108,3 +108,134 @@ function stSold($row) {
 /** The same two questions asked of the table, in SQL (both languages). */
 const STAT_SOLD_SQL   = "(result LIKE 'sold%' OR result LIKE 'vendido%')";
 const STAT_UNSOLD_SQL = "(result LIKE 'not sold%' OR result LIKE 'no se vend%')";
+
+/* ------------------------------------------------ the source's ADVANCED SEARCH
+ * The client, 24 September 2026: "the source our Statistics come from has
+ * filters we don't - make ours the same". aaajapan's statistics search offers,
+ * besides maker/model/chassis/year: auction houses grouped by the weekday they
+ * sell on (several at once, each with its count), mileage, engine size, start
+ * price and final price as from-to ranges, the condition grades as a set of
+ * boxes, transmission, equipment and colour, a lot number, a sortable column for
+ * everything and an average-price column. Everything below serves that.
+ */
+
+/* WHICH COLUMN IS WHICH - read from the source's own row template (tpl_poisk,
+   24 September 2026), not guessed. It prints b.k in the "Engine CC" cell as the
+   gearbox (AT, IAT, FAT, CVT...), b.l under the chassis as the model's grade, and
+   b.m with the class `aj_equip` - the equipment (AAC, AC...). The ingest has
+   always stored k in `grade` and m in `transmission`, so the stored names are
+   the wrong way round. The data is right; only the names lie, so the pages read
+   the gearbox from `grade` and the equipment from `transmission` through these
+   two names, and every label says what the value really is. */
+const STAT_COL_TRANS = 'grade';
+const STAT_COL_EQUIP = 'transmission';
+
+/** The condition grades exactly as the source offers them, in its order. */
+const STAT_GRADES = array('99', '9', '6', '5.', '5', '4.5', '4.3', '4', '3.8', '3.5', '3.3', '3.', '3', '2',
+                          '1KR', '1', '0', 'XX', 'X', 'WR', 'W', 'S', 'RC', 'RB', 'RA1', 'RA', 'R1', 'R',
+                          'N', 'G', 'B', '-', '***', '*');
+
+/** A list from the query string - houses[]=A&houses[]=B or "A,B" - trimmed, capped. */
+function stList($v, $max = 80) {
+    if (!is_array($v)) {
+        $v = ($v === null || $v === '') ? array() : explode(',', (string) $v);
+    }
+    $out = array();
+    foreach ($v as $x) {
+        $x = trim((string) $x);
+        if ($x !== '' && strlen($x) <= 96) {
+            $out[$x] = true;
+        }
+        if (count($out) >= $max) {
+            break;
+        }
+    }
+    return array_keys($out);
+}
+
+/**
+ * A slow answer kept for a while in the server's temp folder. The lists below are
+ * GROUP BYs over a million rows (about a second each) and change slowly, so a page
+ * view must not pay for them every time.
+ */
+function stCached($key, $ttl, $make) {
+    $f = sys_get_temp_dir() . '/sbk-stats-' . preg_replace('/[^a-z0-9_-]/i', '', $key) . '.json';
+    if (is_file($f) && (time() - filemtime($f)) < $ttl) {
+        $v = json_decode((string) @file_get_contents($f), true);
+        if (is_array($v)) {
+            return $v;
+        }
+    }
+    $v = $make();
+    if (is_array($v) && $v) {
+        @file_put_contents($f . '.tmp', json_encode($v));
+        @rename($f . '.tmp', $f);
+    }
+    return is_array($v) ? $v : array();
+}
+
+/** Transmission, equipment and colour, most common first, with their counts. */
+function stFacets($conn) {
+    return stCached('facets', 3600, function () use ($conn) {
+        $out = array('trans' => array(), 'equip' => array(), 'colour' => array());
+        $want = array('trans' => array(STAT_COL_TRANS, 30), 'equip' => array(STAT_COL_EQUIP, 16),
+                      'colour' => array('colour', 30));
+        foreach ($want as $k => $w) {
+            $r = @$conn->query("SELECT {$w[0]} v, COUNT(*) n FROM car_stats
+                                 WHERE {$w[0]} IS NOT NULL AND {$w[0]} <> ''
+                                 GROUP BY {$w[0]} ORDER BY n DESC LIMIT " . (int) $w[1]);
+            while ($r && $x = $r->fetch_assoc()) {
+                $out[$k][] = array((string) $x['v'], (int) $x['n']);
+            }
+        }
+        return $out;
+    });
+}
+
+/**
+ * The auction houses the way the source lays them out: under the weekday each
+ * one sells on, with how many sales it had in the last three months. A house that
+ * sells on two days goes under the busier one.
+ */
+function stHousesByDay($conn) {
+    return stCached('houses-by-day', 1800, function () use ($conn) {
+        $best = array();
+        $r = @$conn->query("SELECT auction, DAYOFWEEK(sold_on) d, COUNT(*) n FROM car_stats
+                             WHERE sold_on >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH) AND auction <> ''
+                             GROUP BY auction, DAYOFWEEK(sold_on)");
+        while ($r && $x = $r->fetch_assoc()) {
+            $h = (string) $x['auction'];
+            $n = (int) $x['n'];
+            if (!isset($best[$h])) {
+                $best[$h] = array('d' => (int) $x['d'], 'top' => $n, 'n' => 0);
+            }
+            $best[$h]['n'] += $n;
+            if ($n > $best[$h]['top']) {
+                $best[$h]['d'] = (int) $x['d'];
+                $best[$h]['top'] = $n;
+            }
+        }
+        $days = array(2 => 'Monday', 3 => 'Tuesday', 4 => 'Wednesday', 5 => 'Thursday',
+                      6 => 'Friday', 7 => 'Saturday', 1 => 'Sunday');
+        $out = array();
+        foreach ($days as $d => $name) {
+            $list = array();
+            foreach ($best as $h => $b) {
+                if ($b['d'] === $d) {
+                    $list[] = array($h, $b['n']);
+                }
+            }
+            usort($list, function ($a, $b) { return strcasecmp($a[0], $b[0]); });
+            if ($list) {
+                $out[] = array('day' => $name, 'houses' => $list);
+            }
+        }
+        return $out;
+    });
+}
+
+/** Every key the Statistics list reads from its address - the pager, the sort
+    headings, "Back" from a sale's own page and the download all carry these. */
+const STAT_KEYS = array('maker', 'model', 'chassis', 'auction', 'months', 'y1', 'y2', 'result', 'page',
+                        'lot', 'houses', 'grades', 'trans', 'equip', 'colour', 'km1', 'km2', 'cc1', 'cc2',
+                        'sp1', 'sp2', 'fp1', 'fp2', 'sort', 'dir', 'per');
