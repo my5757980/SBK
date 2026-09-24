@@ -262,6 +262,12 @@ require_once '_header.php';
   Inventory syncs automatically from the Japanese auction feed.
   <?php if ($last_sync): ?>Last update <?php echo date('M j, Y H:i', strtotime($last_sync)); ?>.<?php endif; ?>
 </p>
+<?php // The IDs both feeds sign in with: green while they fetch, red when one is
+      // signed out, refused or silent. Hover a signal for what it means. ?>
+<div class="src-sig-row">
+  <?php echo sourceSignal('auction'); ?>
+  <?php echo sourceSignal('statistics'); ?>
+</div>
 
 <div class="kpi-row">
   <?php // One section now. The Fixed price tile and the "Both together" tile

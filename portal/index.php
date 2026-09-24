@@ -108,6 +108,8 @@ require_once 'includes/header.php';
 <main class="container">
 
   <h1 class="pb-title">JAPAN AUTO AUCTION</h1>
+  <?php // Staff only: is the Pacific Boeki ID this list comes from still working? ?>
+  <?php echo sourceSignal('auction', 'src-sig-line'); ?>
 
   <!-- ---------------------------------------------------------------- filters -->
   <form method="GET" class="pb-search" id="pbSearch">

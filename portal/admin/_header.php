@@ -11,6 +11,9 @@ if (!function_exists('assetV')) {
 $page_title = isset($page_title) ? $page_title : 'Admin';
 $active     = isset($active) ? $active : '';
 
+// The green / red signal for the IDs the feeds sign in with.
+require_once dirname(__DIR__) . '/includes/source-health.php';
+
 /**
  * One small line drawing per section.
  *
@@ -107,6 +110,7 @@ $me = currentStaff();
 <title><?php echo sanitize($page_title); ?> — <?php echo SITE_NAME; ?></title>
 <link rel="icon" type="image/png" href="<?php echo assetV('assets/img/favicon.png'); ?>">
 <link rel="stylesheet" href="<?php echo assetV('assets/css/style.css'); ?>">
+<script src="<?php echo assetV('assets/js/source-signal.js'); ?>" defer></script>
 </head>
 <body class="admin-body">
 
