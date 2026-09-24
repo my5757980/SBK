@@ -29,7 +29,9 @@ if ($r = @$conn->query("SHOW TABLES LIKE 'car_stats'")) {
 }
 
 $page     = max(1, (int) ($_GET['page'] ?? 1));
-$per_page = 30;
+/* 30 by default; 50 or 100 on request, as the source offers. */
+$per_page = (int) ($_GET['per'] ?? 30);
+if (!in_array($per_page, array(30, 50, 100), true)) { $per_page = 30; }
 
 $maker  = trim($_GET['maker'] ?? '');
 $model  = trim($_GET['model'] ?? '');
@@ -43,6 +45,53 @@ $result = trim($_GET['result'] ?? '');
    and narrows nothing - it simply is not a filter. */
 $months = trim($_GET['months'] ?? '');
 if (!in_array($months, array('1', '2', '3'), true)) { $months = ''; }
+
+/* The source's ADVANCED SEARCH, filter for filter (the client, 24 September 2026:
+   "the source has filters we don't"). See includes/statistics-lib.php. Every value
+   is bound as a parameter; nothing typed reaches the SQL as text. */
+$lot    = trim($_GET['lot'] ?? '');
+$houses = stList($_GET['houses'] ?? array());
+if ($hall !== '' && !in_array($hall, $houses, true)) { $houses[] = $hall; }   // old ?auction= links
+$hall   = '';
+$grades = array_values(array_intersect(STAT_GRADES, stList($_GET['grades'] ?? array())));
+$trans  = trim($_GET['trans'] ?? '');
+$equip  = trim($_GET['equip'] ?? '');
+$colour = trim($_GET['colour'] ?? '');
+$ranges = array();
+foreach (array('km' => 'mileage', 'cc' => 'engine_cc', 'sp' => 'start_price', 'fp' => 'final_price') as $rk => $col) {
+    $ranges[$rk] = array($col,
+        preg_replace('/\D+/', '', (string) ($_GET[$rk . '1'] ?? '')),
+        preg_replace('/\D+/', '', (string) ($_GET[$rk . '2'] ?? '')));
+}
+$advOn = ($houses || $grades || $trans !== '' || $equip !== '' || $colour !== ''
+          || array_filter($ranges, function ($r) { return $r[1] !== '' || $r[2] !== ''; }));
+
+/* Every column sorts, both ways, as on the source. The key is looked up here, so
+   only these expressions ever reach ORDER BY. */
+$SORTS = array(
+    'date'  => array('sold_on', 'DESC'),       'hall'  => array('auction', 'ASC'),
+    'lot'   => array('CAST(lot_no AS UNSIGNED)', 'ASC'),
+    'model' => array('maker %s, model', 'ASC'), 'year'  => array('year', 'DESC'),
+    'chassis' => array('chassis', 'ASC'),      'cc'    => array('engine_cc', 'DESC'),
+    'km'    => array('mileage', 'ASC'),        'grade' => array('rating', 'ASC'),
+    'start' => array('start_price', 'DESC'),   'final' => array('final_price', 'DESC'),
+);
+$sort = (string) ($_GET['sort'] ?? 'date');
+if (!isset($SORTS[$sort])) { $sort = 'date'; }
+$dir = strtolower((string) ($_GET['dir'] ?? ''));
+$dir = ($dir === 'asc' || $dir === 'desc') ? strtoupper($dir) : $SORTS[$sort][1];
+$orderBy = sprintf(strpos($SORTS[$sort][0], '%s') !== false ? $SORTS[$sort][0] : $SORTS[$sort][0] . ' %s', $dir)
+         . ($sort === 'model' ? ' ' . $dir : '') . ', sold_on DESC, auction ASC, lot_no ASC';
+/* A blank or zero value says nothing, so it goes LAST whichever way a column is
+   sorted - "mileage, lowest first" opened on thirty rows of dashes before this.
+   (The date keeps its plain order, which an index serves.) */
+$blank = array('km' => "(mileage IS NULL OR mileage = 0)", 'cc' => "(engine_cc IS NULL OR engine_cc = 0)",
+               'year' => "(year IS NULL OR year = 0)", 'start' => "(start_price IS NULL OR start_price = 0)",
+               'final' => "(final_price IS NULL OR final_price = 0)", 'grade' => "(rating IS NULL OR rating = '')",
+               'chassis' => "(chassis IS NULL OR chassis = '')", 'hall' => "(auction = '')");
+if (isset($blank[$sort])) {
+    $orderBy = $blank[$sort] . ' ASC, ' . $orderBy;
+}
 
 $where  = array('1=1');
 $params = array();
@@ -78,7 +127,60 @@ if ($result === 'sold') {
 } elseif ($result === 'unsold') {
     $where[] = STAT_UNSOLD_SQL;
 }
+if ($lot !== '') {
+    // one lot number or several, as the source's lot box takes them
+    $lots = array_slice(array_values(array_filter(preg_split('/[\s,;]+/', $lot), 'strlen')), 0, 20);
+    if ($lots) {
+        $where[] = 'lot_no IN (' . implode(',', array_fill(0, count($lots), '?')) . ')';
+        foreach ($lots as $l) { $params[] = $l; $types .= 's'; }
+    }
+}
+if ($houses) {
+    $where[] = 'auction IN (' . implode(',', array_fill(0, count($houses), '?')) . ')';
+    foreach ($houses as $h) { $params[] = $h; $types .= 's'; }
+}
+if ($grades) {
+    $where[] = 'rating IN (' . implode(',', array_fill(0, count($grades), '?')) . ')';
+    foreach ($grades as $g) { $params[] = $g; $types .= 's'; }
+}
+if ($trans !== '')  { $where[] = STAT_COL_TRANS . ' = ?'; $params[] = $trans;  $types .= 's'; }
+if ($equip !== '')  { $where[] = STAT_COL_EQUIP . ' = ?'; $params[] = $equip;  $types .= 's'; }
+if ($colour !== '') { $where[] = 'colour = ?';            $params[] = $colour; $types .= 's'; }
+foreach ($ranges as $r) {
+    if ($r[1] !== '') { $where[] = $r[0] . ' >= ?'; $params[] = (int) $r[1]; $types .= 'i'; }
+    if ($r[2] !== '') { $where[] = $r[0] . ' <= ?'; $params[] = (int) $r[2]; $types .= 'i'; }
+}
 $where_sql = implode(' AND ', $where);
+
+/* The list as a spreadsheet - the source's download button. For the desk only:
+   the statistics are the business's paid data, and a customer copying ten
+   thousand rows at a click is not something to hand out by default. */
+if (isset($_GET['csv']) && isAdmin() && $haveTable) {
+    if (function_exists('session_write_close')) { session_write_close(); }
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="sbk-statistics-' . date('Y-m-d') . '.csv"');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");                         // so Excel reads the yen sign and the dashes
+    fputcsv($out, array('Sold on', 'Time', 'Auction', 'Lot', 'Maker', 'Model', 'Year', 'Chassis', 'Model grade',
+                        'Engine cc', 'HP', 'Transmission', 'Equipment', 'Drive', 'Mileage km', 'Colour',
+                        'Condition', 'Start JPY', 'Final JPY', 'Result'));
+    $st = $conn->prepare("SELECT * FROM car_stats WHERE $where_sql ORDER BY $orderBy LIMIT 10000");
+    if ($st) {
+        if ($params) { $st->bind_param($types, ...$params); }
+        $st->execute();
+        $res = $st->get_result();
+        while ($c = $res->fetch_assoc()) {
+            $o = stOutcome($c);
+            fputcsv($out, array($c['sold_on'], $c['sold_time'], $c['auction'], $c['lot_no'], $c['maker'], $c['model'],
+                $c['year'], $c['chassis'], $c['model_grade'], $c['engine_cc'], $c['engine_hp'],
+                $c[STAT_COL_TRANS], $c[STAT_COL_EQUIP], $c['drive'], $c['mileage'], $c['colour'], $c['rating'],
+                $c['start_price'], $c['final_price'], $o['label']));
+        }
+        $st->close();
+    }
+    fclose($out);
+    exit;
+}
 
 /* The count-only answer, and it has to come BEFORE the page's own queries.
  *
@@ -97,22 +199,17 @@ if (isset($_GET['count'])) {
     header('Cache-Control: no-store');
     $t = 0; $sn = 0; $av = null;
     if ($haveTable) {
-        $st = $conn->prepare("SELECT COUNT(*) n FROM car_stats WHERE $where_sql");
-        if ($st) {
-            if ($params) { $st->bind_param($types, ...$params); }
-            $st->execute();
-            $t = (int) $st->get_result()->fetch_assoc()['n'];
-            $st->close();
-        }
         $st = $conn->prepare(
-            "SELECT COUNT(*) n, AVG(final_price) a FROM car_stats
-              WHERE $where_sql AND final_price > 0
-                AND " . STAT_SOLD_SQL . "");
+            "SELECT COUNT(*) n,
+                    SUM(final_price > 0 AND " . STAT_SOLD_SQL . ") sn,
+                    AVG(CASE WHEN final_price > 0 AND " . STAT_SOLD_SQL . " THEN final_price END) a
+               FROM car_stats WHERE $where_sql");
         if ($st) {
             if ($params) { $st->bind_param($types, ...$params); }
             $st->execute();
             $g = $st->get_result()->fetch_assoc();
-            $sn = (int) $g['n'];
+            $t  = (int) $g['n'];
+            $sn = (int) $g['sn'];
             $av = $g['a'] !== null ? (int) round((float) $g['a']) : null;
             $st->close();
         }
@@ -129,29 +226,41 @@ $makers = array();
 $halls  = array();
 
 if ($haveTable) {
-    $st = $conn->prepare("SELECT COUNT(*) n FROM car_stats WHERE $where_sql");
-    if ($st) {
-        if ($params) { $st->bind_param($types, ...$params); }
-        $st->execute();
-        $total = (int) $st->get_result()->fetch_assoc()['n'];
-        $st->close();
+    /* Unfiltered, these three figures are a count and an average over the whole
+       million-row table - about a second - and they move by a few rows a minute.
+       Kept sixty seconds; a filtered list always counts afresh. */
+    $plain = ($where_sql === '1=1');
+    $cachedTotals = $plain ? stCached('totals', 60, function () use ($conn) {
+        $n = (int) $conn->query("SELECT COUNT(*) FROM car_stats")->fetch_row()[0];
+        $g = $conn->query("SELECT COUNT(*) n, AVG(final_price) a FROM car_stats
+                            WHERE final_price > 0 AND " . STAT_SOLD_SQL)->fetch_assoc();
+        return array('total' => $n, 'sold' => (int) $g['n'], 'avg' => $g['a'] !== null ? (float) $g['a'] : null);
+    }) : null;
+    /* Filtered: the count, how many of them sold, and their average - ONE pass
+       over the matching rows rather than two. */
+    $st = $cachedTotals ? null : $conn->prepare(
+        "SELECT COUNT(*) n,
+                SUM(final_price > 0 AND " . STAT_SOLD_SQL . ") sn,
+                AVG(CASE WHEN final_price > 0 AND " . STAT_SOLD_SQL . " THEN final_price END) a
+           FROM car_stats WHERE $where_sql");
+    if ($cachedTotals) {
+        $total = (int) $cachedTotals['total'];
+        $soldN = (int) $cachedTotals['sold'];
+        $avg   = $cachedTotals['avg'];
     }
-
-    /* The average is of what actually sold, and of nothing else. Folding the
-       unsold in would drag it toward the last bid nobody accepted, which is the
-       one number a buyer must not mistake for a price. */
-    $st = $conn->prepare(
-        "SELECT COUNT(*) n, AVG(final_price) a FROM car_stats
-          WHERE $where_sql AND final_price > 0
-            AND " . STAT_SOLD_SQL . "");
     if ($st) {
         if ($params) { $st->bind_param($types, ...$params); }
         $st->execute();
         $g = $st->get_result()->fetch_assoc();
-        $soldN = (int) $g['n'];
+        $total = (int) $g['n'];
+        $soldN = (int) $g['sn'];
         $avg   = $g['a'] !== null ? (float) $g['a'] : null;
         $st->close();
     }
+
+    /* The average above is of what actually sold, and of nothing else. Folding
+       the unsold in would drag it toward the last bid nobody accepted, which is
+       the one number a buyer must not mistake for a price. */
 
     $pages  = max(1, (int) ceil($total / $per_page));
     $page   = min($page, $pages);
@@ -163,7 +272,7 @@ if ($haveTable) {
                 rating, engine_hp, drive, colour, start_price, final_price, result, photos
            FROM car_stats
           WHERE $where_sql
-          ORDER BY sold_on DESC, auction ASC, lot_no ASC
+          ORDER BY $orderBy
           LIMIT ? OFFSET ?");
     if ($st) {
         $p2 = $params; $p2[] = $per_page; $p2[] = $offset;
@@ -173,25 +282,76 @@ if ($haveTable) {
         $st->close();
     }
 
-    if ($res = @$conn->query(
-        "SELECT maker, COUNT(*) n FROM car_stats WHERE maker <> ''
-          GROUP BY maker ORDER BY maker ASC")) {
-        while ($w = $res->fetch_assoc()) { $makers[] = $w; }
-    }
-    if ($res = @$conn->query(
-        "SELECT auction, COUNT(*) n FROM car_stats WHERE auction <> ''
-          GROUP BY auction ORDER BY auction ASC")) {
-        while ($w = $res->fetch_assoc()) { $halls[] = $w; }
+    // A GROUP BY over a million rows for a list that changes slowly: kept ten minutes.
+    $makers = stCached('makers', 600, function () use ($conn) {
+        $out = array();
+        if ($res = @$conn->query(
+            "SELECT maker, COUNT(*) n FROM car_stats WHERE maker <> ''
+              GROUP BY maker ORDER BY maker ASC")) {
+            while ($w = $res->fetch_assoc()) { $out[] = $w; }
+        }
+        return $out;
+    });
+    $housesByDay = stHousesByDay($conn);
+    $facets      = stFacets($conn);
+
+    /* THE AVERAGE-PRICE COLUMN, as the source has it: for each row, what the same
+       model code sold for over the last three months - the average, how many, and
+       the last ten prices as small bars. One query for every code on the page. */
+    $avgBy = array();
+    $codes = array_values(array_unique(array_filter(array_map(function ($c) {
+        return trim((string) $c['chassis']); }, $rows), 'strlen')));
+    if ($codes) {
+        // One pass: the window gives each code's count and average beside its
+        // ten newest prices. k_chassis_day makes the three-month range direct.
+        $ph = implode(',', array_fill(0, count($codes), '?'));
+        $st = $conn->prepare(
+            "SELECT chassis, final_price, rn, cnt, av FROM (
+                SELECT chassis, final_price,
+                       ROW_NUMBER() OVER (PARTITION BY chassis ORDER BY sold_on DESC, stat_id) rn,
+                       COUNT(*) OVER (PARTITION BY chassis) cnt,
+                       AVG(final_price) OVER (PARTITION BY chassis) av
+                  FROM car_stats
+                 WHERE chassis IN ($ph) AND final_price > 0 AND " . STAT_SOLD_SQL . "
+                   AND sold_on >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)) x
+             WHERE rn <= 10");
+        if ($st) {
+            $st->bind_param(str_repeat('s', count($codes)), ...$codes);
+            $st->execute();
+            $res = $st->get_result();
+            while ($x = $res->fetch_assoc()) {
+                $k = $x['chassis'];
+                if (!isset($avgBy[$k])) {
+                    $avgBy[$k] = array('avg' => (float) $x['av'], 'n' => (int) $x['cnt'], 'hist' => array());
+                }
+                $avgBy[$k]['hist'][(int) $x['rn']] = (int) $x['final_price'];
+            }
+            $st->close();
+        }
+        foreach ($avgBy as $k => $v) {            // oldest on the left, as the source draws it
+            krsort($v['hist']);
+            $avgBy[$k]['hist'] = array_values($v['hist']);
+        }
     }
 } else {
     $pages = 1;
 }
 
 function stQs($over = array()) {
-    $keys = array('maker', 'model', 'chassis', 'auction', 'months', 'y1', 'y2', 'result', 'page');
-    $a = array_merge(array_intersect_key($_GET, array_flip($keys)), $over);
-    $a = array_filter($a, 'strlen');
-    return 'statistics.php' . ($a ? '?' . http_build_query($a) : '');
+    $a = array_merge(array_intersect_key($_GET, array_flip(STAT_KEYS)), $over);
+    $a = array_filter($a, function ($v) { return is_array($v) ? (bool) $v : strlen((string) $v) > 0; });
+    // houses[]=A&houses[]=B, as the form itself sends them - not houses[0]=A
+    return 'statistics.php' . ($a ? '?' . preg_replace('/%5B\d+%5D=/', '%5B%5D=', http_build_query($a)) : '');
+}
+
+/** A column heading that sorts: first click the column's natural way, then flips. */
+function stSortLink($key, $label) {
+    global $sort, $dir, $SORTS;
+    $on   = ($sort === $key);
+    $next = $on ? ($dir === 'ASC' ? 'desc' : 'asc') : strtolower($SORTS[$key][1]);
+    $mark = $on ? ($dir === 'ASC' ? ' &#9650;' : ' &#9660;') : '';
+    return '<a class="st-sort' . ($on ? ' is-on' : '') . '" href="'
+         . sanitize(stQs(array('sort' => $key, 'dir' => $next, 'page' => 1))) . '">' . $label . $mark . '</a>';
 }
 
 // statPhotos(), stOutcome() and stSold() live in includes/statistics-lib.php,
@@ -247,15 +407,11 @@ require_once 'includes/header.php';
            value="<?php echo sanitize($model); ?>" style="min-width:150px">
     <input type="text" name="chassis" class="input" placeholder="chassis"
            value="<?php echo sanitize($chas); ?>" style="min-width:130px">
-    <select name="auction" class="select">
-      <option value="">All halls</option>
-      <?php foreach ($halls as $hh): ?>
-        <option value="<?php echo sanitize($hh['auction']); ?>"
-          <?php echo $hall === $hh['auction'] ? 'selected' : ''; ?>>
-          <?php echo sanitize($hh['auction']); ?>
-        </option>
-      <?php endforeach; ?>
-    </select>
+    <?php // The halls moved into the advanced search, grouped by weekday and
+          // several at once, as the source lays them out. Its place here is the
+          // source's lot-number box - one lot, or several with commas. ?>
+    <input type="text" name="lot" class="input" placeholder="lot number(s)"
+           value="<?php echo sanitize($lot); ?>" style="min-width:130px">
     <input type="text" name="y1" class="input" placeholder="year from"
            value="<?php echo sanitize($y1); ?>" style="width:92px">
     <input type="text" name="y2" class="input" placeholder="to"
@@ -275,9 +431,92 @@ require_once 'includes/header.php';
       <option value="unsold" <?php echo $result === 'unsold' ? 'selected' : ''; ?>>Not sold only</option>
     </select>
     <button type="submit" class="btn btn-dark">Search</button>
-    <?php if ($maker || $model || $chas || $hall || $months || $y1 || $y2 || $result): ?>
+    <?php if ($maker || $model || $chas || $months || $y1 || $y2 || $result || $lot !== '' || $advOn): ?>
       <a href="statistics.php" class="btn btn-ghost">Reset</a>
     <?php endif; ?>
+    <?php if (isAdmin()): ?>
+      <a href="<?php echo sanitize(stQs(array('csv' => 1, 'page' => ''))); ?>" class="btn btn-ghost"
+         title="This list as a spreadsheet - up to 10,000 rows. The desk only.">Download CSV</a>
+    <?php endif; ?>
+    <?php // A new search keeps the chosen order and page size. ?>
+    <?php if ($sort !== 'date' || $dir !== 'DESC'): ?>
+      <input type="hidden" name="sort" value="<?php echo sanitize($sort); ?>">
+      <input type="hidden" name="dir" value="<?php echo strtolower($dir); ?>">
+    <?php endif; ?>
+    <?php if ($per_page !== 30): ?>
+      <input type="hidden" name="per" value="<?php echo (int) $per_page; ?>">
+    <?php endif; ?>
+
+    <?php /* THE SOURCE'S ADVANCED SEARCH (the client, 24 September 2026). The
+             halls under the weekday each one sells on, with its count over the
+             last three months; the four from-to ranges; transmission, equipment
+             and colour; and the condition grades as the source's own row of
+             boxes. A native <details>, so it opens without any script, and it
+             opens by itself whenever one of its filters is in use. */ ?>
+    <details class="st-adv"<?php echo $advOn ? ' open' : ''; ?>>
+      <summary>Advanced search<?php if ($advOn): ?> <span class="st-adv-on">in use</span><?php endif; ?></summary>
+      <div class="st-adv-body">
+        <?php if (!empty($housesByDay)): ?>
+          <div class="st-adv-houses">
+            <?php foreach ($housesByDay as $grp): ?>
+              <div class="st-day">
+                <b><?php echo sanitize($grp['day']); ?></b>
+                <?php foreach ($grp['houses'] as $h): ?>
+                  <label class="st-chk">
+                    <input type="checkbox" name="houses[]" value="<?php echo sanitize($h[0]); ?>"<?php
+                      echo in_array($h[0], $houses, true) ? ' checked' : ''; ?>>
+                    <?php echo sanitize($h[0]); ?> <i>(<?php echo number_format($h[1]); ?>)</i>
+                  </label>
+                <?php endforeach; ?>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+        <div class="st-adv-grid">
+          <div class="st-ranges">
+            <?php foreach (array('km' => 'Mileage (km)', 'cc' => 'Engine (cc)', 'sp' => 'Start price (&yen;)',
+                                 'fp' => 'Final price (&yen;)') as $rk => $rl): ?>
+              <div class="st-range">
+                <span><?php echo $rl; ?></span>
+                <input type="text" inputmode="numeric" name="<?php echo $rk; ?>1" class="input" placeholder="from"
+                       value="<?php echo sanitize($ranges[$rk][1]); ?>">
+                <input type="text" inputmode="numeric" name="<?php echo $rk; ?>2" class="input" placeholder="to"
+                       value="<?php echo sanitize($ranges[$rk][2]); ?>">
+              </div>
+            <?php endforeach; ?>
+            <?php foreach (array('trans' => array('Transmission', $trans), 'equip' => array('Equipment', $equip),
+                                 'colour' => array('Colour', $colour)) as $fk => $fl): ?>
+              <div class="st-range">
+                <span><?php echo $fl[0]; ?></span>
+                <select name="<?php echo $fk; ?>" class="select">
+                  <option value="">Any</option>
+                  <?php foreach (($facets[$fk] ?? array()) as $fv): ?>
+                    <option value="<?php echo sanitize($fv[0]); ?>"<?php echo $fl[1] === $fv[0] ? ' selected' : ''; ?>>
+                      <?php echo sanitize($fv[0]) . ' (' . number_format($fv[1]) . ')'; ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <div class="st-grades">
+            <b>Condition</b>
+            <div class="st-grade-set">
+              <?php foreach (STAT_GRADES as $g): ?>
+                <label class="st-chk st-g">
+                  <input type="checkbox" name="grades[]" value="<?php echo sanitize($g); ?>"<?php
+                    echo in_array($g, $grades, true) ? ' checked' : ''; ?>> <?php echo sanitize($g); ?>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        </div>
+        <div class="st-adv-do">
+          <button type="submit" class="btn btn-dark">Search</button>
+          <a href="statistics.php" class="btn btn-ghost">Clear everything</a>
+        </div>
+      </div>
+    </details>
   </form>
 
   <?php // The count stays visible even at zero so the live poll has something to
@@ -291,7 +530,7 @@ require_once 'includes/header.php';
                and the tiles came to show figures minutes apart. Filtered, it
                counts something no tile shows, so the attribute comes off and the
                page's own poll below owns it again. */
-            $stFiltered = ($maker || $model || $chas || $hall || $months || $y1 || $y2 || $result); ?>
+            $stFiltered = ($maker || $model || $chas || $months || $y1 || $y2 || $result || $lot !== '' || $advOn); ?>
       <span><strong id="stCount"<?php echo $stFiltered ? '' : ' data-live="statistics"'; ?>><?php
         echo number_format($total); ?></strong> in Statistics</span>
       <?php // The badge the auction list carries, for the same reason: the page
@@ -300,15 +539,21 @@ require_once 'includes/header.php';
       <span id="stSoldWrap"<?php echo $soldN > 0 ? '' : ' hidden'; ?>><strong id="stSold"><?php echo number_format($soldN); ?></strong> of them sold</span>
       <span id="stAvgWrap"<?php echo ($soldN > 0 && $avg !== null) ? '' : ' hidden'; ?>>average sale price
         <strong id="stAvg">&yen;<?php echo $avg !== null ? number_format(round($avg)) : '—'; ?></strong></span>
+      <span class="st-per">Show
+        <?php foreach (array(30, 50, 100) as $pp): ?>
+          <?php if ($pp === $per_page): ?><b><?php echo $pp; ?></b><?php else: ?><a href="<?php
+            echo sanitize(stQs(array('per' => $pp === 30 ? '' : $pp, 'page' => ''))); ?>"><?php echo $pp; ?></a><?php endif; ?>
+        <?php endforeach; ?>
+      </span>
     </div>
   <?php endif; ?>
 
   <?php if (!$rows): ?>
     <div class="empty">
-      <h2><?php echo $haveTable && ($maker || $model || $chas)
+      <h2><?php echo $haveTable && ($maker || $model || $chas || $lot !== '' || $advOn || $months || $y1 || $y2 || $result)
             ? 'Nothing matched that' : 'Statistics are still being brought across'; ?></h2>
       <p>
-        <?php if ($haveTable && ($maker || $model || $chas)): ?>
+        <?php if ($haveTable && ($maker || $model || $chas || $lot !== '' || $advOn || $months || $y1 || $y2 || $result)): ?>
           Try a wider search — a maker on its own, or a shorter chassis code.
         <?php else: ?>
           The Statistics are being loaded. It is more than a million sales, so it
@@ -323,22 +568,24 @@ require_once 'includes/header.php';
         <thead>
           <tr>
             <th class="c-shot">Photo</th>
-            <th>Sold on<span class="sub">Hall</span></th>
-            <th>Lot No.</th>
-            <th>Model Name<span class="sub">Year</span></th>
-            <th>Chassis No.<span class="sub">Model Grade</span></th>
-            <th>Engine (CC)</th>
+            <th><?php echo stSortLink('date', 'Sold on'); ?><span class="sub"><?php echo stSortLink('hall', 'Hall'); ?></span></th>
+            <th><?php echo stSortLink('lot', 'Lot No.'); ?></th>
+            <th><?php echo stSortLink('model', 'Model Name'); ?><span class="sub"><?php echo stSortLink('year', 'Year'); ?></span></th>
+            <th><?php echo stSortLink('chassis', 'Chassis No.'); ?><span class="sub">Model Grade</span></th>
+            <th><?php echo stSortLink('cc', 'Engine (CC)'); ?><span class="sub">Equipment</span></th>
             <?php // No `c-km` on the heading: that class paints the mileage
                   // FIGURES grey - a deliberate softening in the body - and on a
                   // heading it made "Mileage (KM)" the one grey word in a row of
                   // white ones. The auction list puts the class on the cell only,
                   // and this now matches it. The width comes from nth-child. ?>
-            <th>Mileage (KM)</th>
+            <th><?php echo stSortLink('km', 'Mileage (KM)'); ?></th>
             <th>Trans.<span class="sub">Color</span></th>
-            <th class="c-grade">Cond.<br>Grade</th>
-            <th class="c-price">Start</th>
-            <th class="c-price">Final</th>
+            <th class="c-grade"><?php echo stSortLink('grade', 'Cond.<br>Grade'); ?></th>
+            <th class="c-price"><?php echo stSortLink('start', 'Start'); ?></th>
+            <th class="c-price"><?php echo stSortLink('final', 'Final'); ?></th>
             <th class="c-result">Result</th>
+            <?php // Last, so the widths style.css gives columns 1-12 by position stay put. ?>
+            <th class="c-avg">Average<span class="sub">same code, 3 months</span></th>
           </tr>
         </thead>
         <tbody>
@@ -387,12 +634,16 @@ require_once 'includes/header.php';
                 <?php if (!empty($c['engine_hp'])): ?>
                   <span class="sub"><?php echo (int) $c['engine_hp']; ?> hp</span>
                 <?php endif; ?>
+                <?php if (!empty($c[STAT_COL_EQUIP])): ?>
+                  <span class="sub st-equip"><?php echo sanitize($c[STAT_COL_EQUIP]); ?></span>
+                <?php endif; ?>
               </td>
               <td class="c-km">
                 <?php echo $c['mileage'] ? number_format($c['mileage']) : '—'; ?>
               </td>
               <td>
-                <?php echo sanitize($c['transmission'] ?: '—'); ?><?php
+                <?php // the gearbox - stored in `grade`, see STAT_COL_TRANS ?>
+                <?php echo sanitize($c[STAT_COL_TRANS] ?: '—'); ?><?php
                   if (!empty($c['drive'])): ?> <?php echo sanitize($c['drive']); ?><?php endif; ?>
                 <span class="sub"><?php echo sanitize($c['colour'] ?: ''); ?></span>
               </td>
@@ -411,6 +662,18 @@ require_once 'includes/header.php';
                 <span class="pill <?php echo $sold ? 'pill-sold' : ($out['key'] === 'unsold' ? 'pill-gone' : 'pill-other'); ?>">
                   <?php echo sanitize($out['short']); ?>
                 </span>
+              </td>
+              <td class="c-avg">
+                <?php $av = $avgBy[trim((string) $c['chassis'])] ?? null; ?>
+                <?php if ($av): $mx = max($av['hist'] ?: array(1)); ?>
+                  <b>&yen;<?php echo number_format(round($av['avg'])); ?></b>
+                  <span class="sub"><?php echo number_format($av['n']); ?> sold</span>
+                  <?php if (count($av['hist']) > 1): ?>
+                    <span class="st-spark" title="The last <?php echo count($av['hist']); ?> sale prices of <?php
+                      echo sanitize($c['chassis']); ?>, oldest first"><?php foreach ($av['hist'] as $hp): ?><i style="height:<?php
+                        echo max(10, (int) round($hp / $mx * 100)); ?>%"></i><?php endforeach; ?></span>
+                  <?php endif; ?>
+                <?php else: ?>&mdash;<?php endif; ?>
               </td>
             </tr>
           <?php endforeach; ?>

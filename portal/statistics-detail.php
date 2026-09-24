@@ -41,17 +41,23 @@ if ($conn && preg_match('/^[a-f0-9]{32}$/', $id)) {
 
 /* Back to the very rows the reader came from: the list's filters and page ride
    along in `back`, and only the list's own keys are accepted from it. */
-$backKeys = array('maker', 'model', 'chassis', 'auction', 'months', 'y1', 'y2', 'result', 'page');
-$backIn   = array();
+$backIn = array();
 parse_str((string) ($_GET['back'] ?? ''), $backIn);
 $backQ = array();
-foreach ($backKeys as $k) {
-    if (isset($backIn[$k]) && is_string($backIn[$k]) && $backIn[$k] !== '') {
+foreach (STAT_KEYS as $k) {
+    if (!isset($backIn[$k])) {
+        continue;
+    }
+    if (is_array($backIn[$k])) {                    // houses[] and grades[]
+        $list = stList($backIn[$k]);
+        if ($list) { $backQ[$k] = $list; }
+    } elseif (is_string($backIn[$k]) && $backIn[$k] !== '') {
         $backQ[$k] = $backIn[$k];
     }
 }
-$backUrl  = 'statistics.php' . ($backQ ? '?' . http_build_query($backQ) : '');
-$backPass = $backQ ? '&back=' . rawurlencode(http_build_query($backQ)) : '';
+$backQs   = preg_replace('/%5B\d+%5D=/', '%5B%5D=', http_build_query($backQ));   // houses[]=, as the form sends
+$backUrl  = 'statistics.php' . ($backQ ? '?' . $backQs : '');
+$backPass = $backQ ? '&back=' . rawurlencode($backQs) : '';
 
 /* The same model code's other sales, and what it has been fetching. The code is
    what the source prints beside every lot, so it is what joins one sale to the
@@ -153,9 +159,11 @@ require_once 'includes/header.php';
         array('Year', $sale['year'] ? (int) $sale['year'] : '—', ''),
         array('Chassis (model code)', $code !== '' ? $code : '—', ''),
         array('Model grade', $sale['model_grade'] ?: '—', ''),
-        array('Grade', $sale['grade'] ?: '—', ''),
+        // The gearbox and the equipment are stored under each other's names - see
+        // STAT_COL_TRANS / STAT_COL_EQUIP in statistics-lib.php.
         array('Engine', $engine, ''),
-        array('Transmission', trim(($sale['transmission'] ?: '—') . (!empty($sale['drive']) ? ' · ' . $sale['drive'] : '')), ''),
+        array('Transmission', trim(($sale[STAT_COL_TRANS] ?: '—') . (!empty($sale['drive']) ? ' · ' . $sale['drive'] : '')), ''),
+        array('Equipment', $sale[STAT_COL_EQUIP] ?: '—', ''),
         array('Mileage', $sale['mileage'] ? number_format($sale['mileage']) . ' km' : '—', ''),
         array('Colour', $sale['colour'] ?: '—', ''),
         array('Condition grade', $sale['rating'] ?: '—', 'is-grade'),

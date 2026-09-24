@@ -52,3 +52,59 @@ a.st-open:focus-visible{outline:2px solid #0370cd;outline-offset:2px;border-radi
   .sd-rise{width:100%;text-align:center}
   .sd-summary{gap:4px 14px;padding:12px 14px}
 }
+
+/* ---------- the source's ADVANCED SEARCH (24 September 2026) -------------- */
+.pb-stats-form .st-adv{flex:1 1 100%;margin-top:4px;border:1px solid #e3e1dc;border-radius:12px;background:#fbfaf7}
+.st-adv > summary{
+  cursor:pointer;list-style:none;padding:10px 14px;font-weight:700;font-size:13.5px;color:#1a2433;
+  display:flex;align-items:center;gap:8px;user-select:none;
+}
+.st-adv > summary::-webkit-details-marker{display:none}
+.st-adv > summary::before{content:"\25B8";color:#b3651a;transition:transform .15s}
+.st-adv[open] > summary::before{transform:rotate(90deg)}
+.st-adv-on{font-size:11px;font-weight:700;color:#fff;background:#b3651a;border-radius:100px;padding:2px 8px}
+.st-adv-body{padding:4px 14px 14px;border-top:1px solid #ece9e2}
+
+.st-adv-houses{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px 18px;
+  padding:10px 0 12px;border-bottom:1px dashed #e3e1dc;
+}
+.st-day b{display:block;font-size:13px;color:#1a2433;margin:4px 0 4px;border-bottom:1px solid #ece9e2;padding-bottom:3px}
+.st-chk{display:flex;align-items:center;gap:6px;font-size:12.5px;line-height:1.35;color:#2c3440;cursor:pointer;padding:1px 0}
+.st-chk input{margin:0;flex:none}
+.st-chk i{font-style:normal;color:#8b949e;font-size:11.5px}
+
+.st-adv-grid{display:grid;grid-template-columns:minmax(260px,420px) 1fr;gap:18px;padding-top:12px}
+.st-ranges{display:flex;flex-direction:column;gap:7px}
+.st-range{display:grid;grid-template-columns:118px 1fr 1fr;align-items:center;gap:6px}
+.st-range > span{font-size:12.5px;font-weight:650;color:#3a4250}
+.st-range .input,.st-range .select{width:100%;min-width:0}
+.st-range select.select{grid-column:2 / span 2}
+.st-grades > b{display:block;font-size:13px;color:#1a2433;margin-bottom:6px}
+.st-grade-set{display:flex;flex-wrap:wrap;gap:6px 12px}
+.st-g{min-width:46px}
+.st-adv-do{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+
+/* ---------- sorting, page size ---------------------------------------------- */
+a.st-sort{color:inherit;text-decoration:none;white-space:nowrap}
+a.st-sort:hover{text-decoration:underline}
+a.st-sort.is-on{color:#b3651a}
+.st-per{margin-left:auto;font-size:12.5px;color:#5b6573;display:inline-flex;gap:8px;align-items:center}
+.st-per a{color:#0370cd;text-decoration:none}
+.st-per b{color:#1a2433}
+
+/* ---------- the average-price column: the 13th, after Result ----------------- */
+.lot-table-stats{min-width:1466px}
+.lot-table-stats th:nth-child(13){width:130px}
+.c-avg b{display:block;font-size:13px;color:#1a2433}
+.c-avg .sub{display:block}
+.st-spark{display:flex;align-items:flex-end;gap:2px;height:26px;margin-top:4px}
+.st-spark i{display:block;width:7px;background:#9fc3e6;border-radius:2px 2px 0 0}
+.st-spark i:last-child{background:#0370cd}
+.st-equip{color:#7b8794}
+
+@media (max-width:760px){
+  .st-adv-grid{grid-template-columns:1fr}
+  .st-range{grid-template-columns:96px 1fr 1fr}
+  .st-per{margin-left:0}
+}
