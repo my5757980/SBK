@@ -545,18 +545,18 @@ function tick(force) {
     // messages
     if (j.messages && j.messages.length) {
       var stick = atBottom();
-      var fresh = 0;
+      var fresh = 0, lastIn = null;
       for (var i = 0; i < j.messages.length; i++) {
         var m = j.messages[i];
         if (m.id > state.lastId) { state.lastId = m.id; }
         if (!state.seen[m.id]) {
           if (scroll.querySelector('.empty')) { scroll.innerHTML = ''; }
           bubble(m);
-          if (!m.mine) { fresh++; }
+          if (!m.mine) { fresh++; lastIn = m; }
         }
       }
       if (stick) { toBottom(); }
-      if (fresh) { chime(); }
+      if (fresh) { chime(lastIn); }
     }
     // ticks that moved
     if (j.receipts) { refreshTicks(j.receipts); }
@@ -566,6 +566,8 @@ function tick(force) {
     if (!isGuest && j.groups) { lastGroups = j.groups; }
     if (!isGuest && j.list)  { drawThreads(j.list, !!j.all); syncHead(null, j.list); }
     if (!isGuest && state.group) { syncGroupHead(); }
+    // Somebody wrote in a conversation that is not the one being read: pop up.
+    if (!isGuest && j.list) { noticeScan(j.list, j.groups || lastGroups || []); }
 
     // A call ringing for this person, wherever in the chat they are looking.
     if (j.call && j.call.incoming && j.call.state === 'ringing' && !cv.id) {
@@ -669,8 +671,7 @@ function setUnread(n) {
 /* A short tone, made in the browser. A sound file would be one more thing to
    fetch and one more thing to fail. */
 var ac = null;
-function chime() {
-  if (document.hasFocus() && state.thread) { return; }
+function tone() {
   try {
     ac = ac || new (window.AudioContext || window.webkitAudioContext)();
     var o = ac.createOscillator(), g = ac.createGain();
@@ -681,17 +682,172 @@ function chime() {
     g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.32);
     o.start(); o.stop(ac.currentTime + 0.34);
   } catch (e) { /* a browser that will not make a noise is not a fault */ }
+}
 
-  if (window.Notification && Notification.permission === 'granted' && document.hidden) {
-    try { new Notification('SBK — new message'); } catch (e) {}
+/** What a message says, in one line fit for a pop-up. */
+function noticeText(s) {
+  var t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
+  if (!t) { return 'New message'; }
+  return t.length > 140 ? t.slice(0, 139) + '…' : t;
+}
+function messageLine(m) {
+  if (!m) { return 'New message'; }
+  if (m.kind === 'image') { return 'Sent a photo'; }
+  if (m.kind === 'voice') { return 'Sent a voice message'; }
+  if (m.kind === 'call')  { return 'Call'; }
+  return noticeText(m.body);
+}
+
+/** The computer's own notification - only ever when the chat is not in front. */
+function systemNotice(title, text, tag, onOpen) {
+  if (!(document.hidden || !document.hasFocus())) { return; }
+  if (!window.Notification || Notification.permission !== 'granted') { return; }
+  try {
+    var n = new Notification(title, { body: text, tag: tag, renotify: true });
+    n.onclick = function () { n.close(); window.focus(); if (onOpen) { onOpen(); } };
+  } catch (e) { /* a browser that will not show one is not a fault */ }
+}
+
+/* A message in the conversation that is OPEN: the bubble is the news while
+   somebody is looking; when the chat is behind other work, the tone and the
+   computer's own notification say who wrote and what. */
+function chime(m) {
+  if (document.hasFocus() && !document.hidden && (state.thread || state.group)) { return; }
+  tone();
+  systemNotice((m && m.who) || headName.textContent || 'SBK', messageLine(m), 'sbk-open');
+}
+
+/* ------------------------------------------ a message ARRIVES elsewhere: pop up
+
+   The owner, 24 September 2026: when anyone writes, whoever is signed in at the
+   desk - agent, manager, anyone - must get a pop-up, not only a number on the
+   bell. So when the list shows a conversation (or group) with MORE waiting than
+   a moment ago, and it is not the one being read right now:
+
+     - a card slides in at the top with who wrote and what they said,
+     - the tone plays,
+     - and if the chat is not in front (another tab, another window), the
+       COMPUTER's own notification appears in its notification area.
+
+   Clicking the card or the notification opens that conversation. The first
+   answer after the page opens only takes note of what is already waiting: a
+   pop-up for every old message each time the page loads would be a nuisance,
+   and the bell already says those are there. */
+var noticeMark = null;          // 't12' / 'g3' -> 'at|unread' as last seen; null until primed
+var noticeBox = null;
+
+function noticeScan(list, groups) {
+  var now = {}, k, i;
+  for (i = 0; i < list.length; i++)   { now['t' + list[i].id] = list[i]; }
+  for (i = 0; i < groups.length; i++) { now['g' + groups[i].id] = groups[i]; }
+  if (noticeMark === null) {
+    noticeMark = {};
+    for (k in now) { noticeMark[k] = (now[k].at || '') + '|' + (now[k].unread | 0); }
+    return;
+  }
+  for (k in now) {
+    var x = now[k], sig = (x.at || '') + '|' + (x.unread | 0), was = noticeMark[k];
+    noticeMark[k] = sig;
+    if (was === sig || (x.unread | 0) <= 0) { continue; }
+    var before = was ? (parseInt(was.split('|')[1], 10) || 0) : 0;
+    if ((x.unread | 0) <= before) { continue; }      // read elsewhere, or only the preview moved
+    var group = (k.charAt(0) === 'g');
+    // The open conversation's messages arrive as bubbles, and chime() speaks for
+    // them - saying it twice would be two tones and two notifications for one.
+    if (group ? (state.group === x.id) : (state.thread === x.id)) { continue; }
+    announce({ key: k, id: x.id, group: group, name: x.name || 'Somebody',
+               text: noticeText(x.preview), ini: x.ini || '?', hue: x.hue | 0 });
   }
 }
-if (window.Notification && Notification.permission === 'default') {
-  document.addEventListener('click', function once() {
-    document.removeEventListener('click', once);
-    try { Notification.requestPermission(); } catch (e) {}
+
+function openFromNotice(n) {
+  window.focus();
+  var row = sideList.querySelector(n.group ? '.person[data-group="' + n.id + '"]'
+                                           : '.person[data-thread="' + n.id + '"]');
+  if (row) { row.click(); } else { el('bell').click(); }
+}
+
+function announce(n) {
+  tone();
+  if (!noticeBox) {
+    noticeBox = document.createElement('div');
+    noticeBox.className = 'notice-stack';
+    noticeBox.setAttribute('aria-live', 'polite');
+    document.body.appendChild(noticeBox);
+  }
+  var old = noticeBox.querySelector('[data-key="' + n.key + '"]');
+  if (old) { old.parentNode.removeChild(old); }
+  var c = document.createElement('div');
+  c.className = 'notice';
+  c.setAttribute('role', 'status');
+  c.setAttribute('data-key', n.key);
+  c.innerHTML = '<span class="av ' + faceClass(n.hue) + '">' + esc(n.ini) + '</span>'
+    + '<span class="tx"><b>' + esc(n.name) + (n.group ? ' <i>group</i>' : '') + '</b>'
+    + '<span>' + esc(n.text) + '</span></span>'
+    + '<button type="button" class="x" aria-label="Close">&times;</button>';
+  c.addEventListener('click', function (ev) {
+    if (c.parentNode) { c.parentNode.removeChild(c); }
+    if (ev.target.closest && ev.target.closest('.x')) { return; }
+    openFromNotice(n);
+  });
+  noticeBox.insertBefore(c, noticeBox.firstChild);
+  while (noticeBox.children.length > 3) { noticeBox.removeChild(noticeBox.lastChild); }
+  setTimeout(function () {
+    if (!c.parentNode) { return; }
+    c.classList.add('out');
+    setTimeout(function () { if (c.parentNode) { c.parentNode.removeChild(c); } }, 320);
+  }, 9000);
+
+  systemNotice(n.name + (n.group ? ' (group)' : ''), n.text, 'sbk-' + n.key,
+               function () { openFromNotice(n); });
+}
+
+/* The computer's notifications need the person's yes, and a browser only asks
+   after a click. The desk is told plainly, once, with a button; a customer keeps
+   the quieter first-click request the chat always had. */
+function askToNotify() {
+  if (!window.Notification) { return; }
+  var p = Notification.permission;
+  if (isGuest) {
+    if (p === 'default') {
+      document.addEventListener('click', function once() {
+        document.removeEventListener('click', once);
+        try { Notification.requestPermission(); } catch (e) {}
+      });
+    }
+    return;
+  }
+  var dismissed = '';
+  try { dismissed = localStorage.getItem('sbkNotifyAsk') || ''; } catch (e) {}
+  if (p === 'granted' || dismissed === p) { return; }
+  var bar = document.createElement('div');
+  bar.className = 'notify-ask';
+  bar.innerHTML = (p === 'denied')
+    ? '<span><b>Pop-up alerts are blocked</b> in this browser. Allow notifications for this site '
+      + '(the lock beside the address) to see new messages while the chat is in the background.</span>'
+      + '<button type="button" class="x" aria-label="Dismiss">&times;</button>'
+    : '<span><b>Turn on pop-up alerts</b> so a new message shows on your computer even when this '
+      + 'tab is behind other work.</span>'
+      + '<button type="button" class="go">Allow</button>'
+      + '<button type="button" class="x" aria-label="Later">&times;</button>';
+  var side = document.querySelector('.side');
+  if (side) { side.insertBefore(bar, side.firstChild); } else { document.body.appendChild(bar); }
+  bar.addEventListener('click', function (ev) {
+    var t = ev.target;
+    if (t.closest && t.closest('.go')) {
+      var done = function (r) {
+        if (bar.parentNode) { bar.parentNode.removeChild(bar); }
+        if (r !== 'granted') { try { localStorage.setItem('sbkNotifyAsk', r); } catch (e) {} }
+      };
+      try { var ask = Notification.requestPermission(done); if (ask && ask.then) { ask.then(done); } }
+      catch (e) { done('denied'); }
+    } else if (t.closest && t.closest('.x')) {
+      if (bar.parentNode) { bar.parentNode.removeChild(bar); }
+      try { localStorage.setItem('sbkNotifyAsk', p); } catch (e) {}
+    }
   });
 }
+askToNotify();
 el('bell').addEventListener('click', function () {
   var first = sideList.querySelector('.person .pill');
   if (!first) { return; }

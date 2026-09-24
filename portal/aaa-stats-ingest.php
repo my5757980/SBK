@@ -40,6 +40,46 @@ if (AAA_INGEST_TOKEN === '' || !hash_equals(AAA_INGEST_TOKEN, (string) ($_GET['t
     exit;
 }
 
+/* ------------------------------------------------------- "how is the ID?"
+ * The fetcher says, at the end of EVERY run, how its sign-in to aaajapan went -
+ * whether it got in, was refused, was turned away at the door, or has stopped
+ * after a refusal - so the Statistics page can show staff a green or a red
+ * signal (the owner's request of 24 September 2026; see source-health.php).
+ * Kept in the account's home, outside the web root, as the last word only.
+ *
+ *   POST ?t=TOKEN&health=1   {"login":"ok","halted":"","door":0,"spent":false,...}
+ */
+if (isset($_GET['health'])) {
+    $in = json_decode((string) file_get_contents('php://input'), true);
+    if (!is_array($in)) {
+        http_response_code(400);
+        echo json_encode(array('ok' => false, 'error' => 'expected a JSON object'));
+        exit;
+    }
+    $keep = array(
+        'at'        => time(),
+        'login'     => substr((string) ($in['login'] ?? ''), 0, 20),
+        'why'       => substr((string) ($in['why'] ?? ''), 0, 300),
+        'halted'    => substr((string) ($in['halted'] ?? ''), 0, 300),
+        'halted_at' => (int) ($in['halted_at'] ?? 0),
+        'door'      => (int) ($in['door'] ?? 0),
+        'spent'     => !empty($in['spent']),
+        'used'      => (int) ($in['used'] ?? 0),
+        'budget'    => (int) ($in['budget'] ?? 0),
+        'pages'     => (int) ($in['pages'] ?? 0),
+        'new'       => (int) ($in['new'] ?? 0),
+        'run'       => substr((string) ($in['run'] ?? ''), 0, 40),
+    );
+    $dir = dirname(__DIR__) . '/aaa-fetch';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0750, true);
+    }
+    $ok = @file_put_contents($dir . '/health.json.tmp', json_encode($keep)) !== false
+       && @rename($dir . '/health.json.tmp', $dir . '/health.json');
+    echo json_encode(array('ok' => (bool) $ok));
+    exit;
+}
+
 /* ----------------------------------------------------- "what do you have?"
  * The fetcher asks this BEFORE it asks the source for anything, so it never
  * spends a request on a slice whose rows are already here. It costs the source

@@ -716,6 +716,14 @@ add_action('wp_footer', function () {
     setNavCount(0);
     stopRinging();                 // the chat inside rings from here on
     hideToast();
+
+    /* The desk's computer can announce a message with the site behind other
+       work (see popup), but only once the browser has been told yes - and a
+       browser only asks after a click. Opening the chat desk is that click. A
+       customer is never asked by the website. */
+    if (staffLabel && window.Notification && Notification.permission === 'default') {
+      try { Notification.requestPermission(); } catch (e) {}
+    }
   }
   function hide() {
     panel.classList.remove('on');
@@ -785,8 +793,18 @@ add_action('wp_footer', function () {
      The answer carries a fresh token each time, so a window left open all day
      stays green, while a token that leaked somewhere stops being any use within
      five minutes of leaving the browser that is rotating it. */
+  var hiddenAsk = 0;
   function ask() {
-    if (document.hidden) { return; }
+    /* A hidden tab asks nothing - a window left open all day should cost
+       nothing. The desk is the one exception (the owner, 24 September 2026): a
+       message has to reach them while the site sits behind other work, so for
+       staff a hidden tab still asks, twice a minute. */
+    if (document.hidden) {
+      if (!staffLabel) { return; }
+      var t = Date.now();
+      if (t - hiddenAsk < 29000) { return; }
+      hiddenAsk = t;
+    }
     var u = PING + '?from=site' + (token ? '&wp=' + encodeURIComponent(token) : '');
     fetch(u, { credentials: 'include', cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
@@ -869,6 +887,19 @@ add_action('wp_footer', function () {
 
     if (hideTimer) { clearTimeout(hideTimer); }
     hideTimer = setTimeout(hideToast, 8000);
+
+    /* With the site NOT in front - another tab, another window - the card is
+       not seen, so the desk's computer says it in its own notification area:
+       the owner's "notification bar", 24 September 2026. Staff only. Clicking
+       it brings the site forward with the chat open on the conversation. */
+    if (staffLabel && (document.hidden || !document.hasFocus())
+        && window.Notification && Notification.permission === 'granted') {
+      try {
+        var sys = new Notification(last.from || 'SBK', {
+          body: last.text || 'New message', tag: 'sbk-chat-' + last.id, renotify: true });
+        sys.onclick = function () { sys.close(); window.focus(); stopRinging(); hideToast(); show(); };
+      } catch (e) { /* a browser that will not show one is not a fault */ }
+    }
   }
 
   /* ---------------------------------------------------- somebody is CALLING ---

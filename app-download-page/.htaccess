@@ -7,3 +7,12 @@ DirectoryIndex index.html
 
 # The download page's address given out earlier the same day.
 RedirectMatch 302 ^/app/?$ /
+
+# The APK is handed to GitHub's download network, and the address people already
+# have keeps working. THIS host closes a transfer that lasts longer than about
+# four minutes: measured on 22 September 2026, a phone at 150 KB/s was cut off at
+# 38.6 of 63.5 MB, and three of five downloads at once were cut at 5.5, 18.3 and
+# 30.9 MB. A cut download leaves a half-written file, and Android reports that as
+# "there was a problem parsing the package" - which is exactly what customers saw.
+# The release is public and holds the APK alone; no code is published with it.
+RedirectMatch 302 ^/SBK-Chat\.apk$ https://github.com/MohsinRaza2000/SBK-APK/releases/download/v1.0.9/SBK-Chat.apk

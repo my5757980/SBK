@@ -272,6 +272,9 @@ require_once 'includes/header.php';
       </span>
     </div>
     <div class="lab-actions">
+      <?php // Staff only: is the aaajapan ID these figures come from still
+            // working? Green or red - the owner's request of 24 September 2026. ?>
+      <?php echo sourceSignal('statistics'); ?>
       <a href="welcome.php" class="btn btn-secondary">Go to auctions</a>
     </div>
   </div>

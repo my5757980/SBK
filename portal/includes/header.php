@@ -11,6 +11,9 @@ if (!function_exists('assetV')) {
 }
 $page_title = isset($page_title) ? $page_title : SITE_NAME;
 
+// The green / red signal for the IDs the feeds sign in with (staff only).
+require_once __DIR__ . '/source-health.php';
+
 // Resolve the signed-in client once. If the session points at a client that no
 // longer exists (deleted or deactivated while logged in), drop the stale session
 // so the header shows the logged-out state instead of crashing on null['name'].
@@ -38,6 +41,9 @@ if (isLoggedIn() && !$navClient) {
       // said "Updated live from Japan" beside a number that never moved. The
       // script does nothing at all on a page with no such figure on it. ?>
 <script src="<?php echo assetV('assets/js/livecount.js'); ?>" defer></script>
+<?php if (isAdmin()): // the ID signals repaint themselves once a minute - staff only ?>
+<script src="<?php echo assetV('assets/js/source-signal.js'); ?>" defer></script>
+<?php endif; ?>
 </head>
 <body>
 
