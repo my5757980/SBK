@@ -147,14 +147,24 @@ function sourceHealthStatistics($file = null) {
             'The statistics fetcher last reported ' . sourceAgo($age) . '. It runs on GitHub about every twenty '
             . 'minutes - it has probably been stopped there, or its secrets have changed.', (int) $h['at']);
     }
+    // Said as it is: a quiet run that found nothing new never signs in, so the
+    // last sign-in that WORKED is named rather than claimed for this run.
+    $lastOk = (int) ($h['last_ok'] ?? 0);
+    $signed = $lastOk ? ' Last successful sign-in ' . sourceAgo($now - $lastOk) . '.' : '';
     if (!empty($h['spent'])) {
         return sourceState(true, 'ID working',
             'The aaajapan ID is fine. Today\'s allowance of ' . number_format((int) ($h['budget'] ?? 0))
-            . ' requests is used, so it rests until 00:00 UTC (05:00 in Pakistan). Last report ' . sourceAgo($age) . '.',
-            (int) $h['at']);
+            . ' requests is used, so it rests until 00:00 UTC (05:00 in Pakistan). Last report ' . sourceAgo($age) . '.'
+            . $signed, (int) $h['at']);
+    }
+    if ($login === 'ok') {
+        return sourceState(true, 'ID working',
+            'The aaajapan ID signed in and fetched on its last run (' . (int) ($h['pages'] ?? 0) . ' pages, '
+            . (int) ($h['new'] ?? 0) . ' new sales). Last report ' . sourceAgo($age) . '.', (int) $h['at']);
     }
     return sourceState(true, 'ID working',
-        'The aaajapan ID is signed in and fetching. Last report ' . sourceAgo($age) . '.', (int) $h['at']);
+        'No problem reported with the aaajapan ID. Its last run found nothing new to ask the source for, so it '
+        . 'did not need to sign in. Last report ' . sourceAgo($age) . '.' . $signed, (int) $h['at']);
 }
 
 function sourceHealthAll() {

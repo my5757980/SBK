@@ -74,6 +74,12 @@ if (isset($_GET['health'])) {
     if (!is_dir($dir)) {
         @mkdir($dir, 0750, true);
     }
+    /* Most runs on a quiet day find nothing new and never sign in at all, so
+       "the ID worked" has to be remembered from the last run that DID sign in -
+       otherwise the signal could only ever say what this run skipped. */
+    $prev = json_decode((string) @file_get_contents($dir . '/health.json'), true);
+    $keep['last_ok'] = ($keep['login'] === 'ok') ? $keep['at']
+                     : (int) (is_array($prev) ? ($prev['last_ok'] ?? 0) : 0);
     $ok = @file_put_contents($dir . '/health.json.tmp', json_encode($keep)) !== false
        && @rename($dir . '/health.json.tmp', $dir . '/health.json');
     echo json_encode(array('ok' => (bool) $ok));
