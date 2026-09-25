@@ -209,7 +209,7 @@ if (isset($_GET['csv']) && isAdmin() && $haveTable) {
         while ($c = $res->fetch_assoc()) {
             $o = stOutcome($c);
             fputcsv($out, array($c['sold_on'], $c['sold_time'], $c['auction'], $c['lot_no'], $c['maker'], $c['model'],
-                $c['year'], $c['chassis'], $c['model_grade'], $c['engine_cc'], $c['engine_hp'],
+                $c['year'], $c['chassis'], stText($c['model_grade']), $c['engine_cc'], stHp($c) ?: '',
                 $c[STAT_COL_TRANS], $c[STAT_COL_EQUIP], $c['drive'], $c['mileage'], $c['colour'], $c['rating'],
                 $c['start_price'], $c['final_price'], $o['label']));
         }
@@ -660,7 +660,7 @@ require_once 'includes/header.php';
               </td>
               <td>
                 <?php echo sanitize($c['chassis'] ?: '—'); ?>
-                <span class="sub"><?php echo sanitize($c['model_grade'] ?: ''); ?></span>
+                <span class="sub"><?php echo sanitize(stText($c['model_grade'] ?: '')); ?></span>
               </td>
               <?php // The source carries the engine's power beside its size, and
                     // the drive beside the gearbox. Both were being thrown away
@@ -668,8 +668,8 @@ require_once 'includes/header.php';
                     // turned out to be what had been filling the mileage column. ?>
               <td>
                 <?php echo $c['engine_cc'] ? number_format($c['engine_cc']) : '—'; ?>
-                <?php if (!empty($c['engine_hp'])): ?>
-                  <span class="sub"><?php echo (int) $c['engine_hp']; ?> hp</span>
+                <?php if (stHp($c)): ?>
+                  <span class="sub"><?php echo stHp($c); ?> hp</span>
                 <?php endif; ?>
                 <?php if (!empty($c[STAT_COL_EQUIP])): ?>
                   <span class="sub st-equip"><?php echo sanitize($c[STAT_COL_EQUIP]); ?></span>

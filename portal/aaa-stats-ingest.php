@@ -220,7 +220,10 @@ function ingNum($s, $max = 2000000000) {
  * would have seen on the page.
  */
 function ingText($s) {
-    return trim(html_entity_decode(strip_tags((string) $s), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    $t = html_entity_decode(strip_tags((string) $s), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    // The source cuts long texts at a fixed length, sometimes through a character
+    // code ("...ｱｯﾌﾟﾁﾙ&#654", 25 September 2026): half a code is dropped, not kept.
+    return trim(preg_replace('/&#\d*$/', '', $t));
 }
 
 $stmt = $conn->prepare(
