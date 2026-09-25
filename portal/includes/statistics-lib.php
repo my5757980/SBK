@@ -99,6 +99,31 @@ function stOutcome($row) {
     return array('key' => 'other', 'label' => ucfirst($r), 'short' => ucfirst($r), 'sold' => false);
 }
 
+/**
+ * The car's power, as the source gives it - or 0 when it cannot be a power.
+ *
+ * The source's `i` is horsepower for most lots, but for 660cc kei cars - DAYZ,
+ * ALTO, EVERY, HIJET, EK WAGON and the like - it carries a four-digit figure
+ * between 3,034 and 4,964 that is no power at all (a kei car is held to 64 hp by
+ * law). 41,081 rows on 25 September 2026, and every one of them was shown to
+ * buyers as "4964 hp". The table keeps what the source sent; nothing over 1,000
+ * is shown as a power.
+ */
+function stHp($row) {
+    $h = (int) ($row['engine_hp'] ?? 0);
+    return ($h > 0 && $h <= 1000) ? $h : 0;
+}
+
+/**
+ * Text as a person should read it. The source cuts some long texts at a fixed
+ * length, and sometimes through the middle of a character code - a model grade
+ * then ends "...Lift ｱｯﾌﾟﾁﾙ&#654". The broken tail is dropped; nothing else is
+ * touched.
+ */
+function stText($s) {
+    return rtrim(preg_replace('/&#\d*$/', '', (string) $s));
+}
+
 /** Did this lot actually sell? See stOutcome(). */
 function stSold($row) {
     $o = stOutcome($row);

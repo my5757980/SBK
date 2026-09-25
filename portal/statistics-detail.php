@@ -146,8 +146,8 @@ require_once 'includes/header.php';
         $when .= ' · ' . $sale['sold_time'];
     }
     $engine = $sale['engine_cc'] ? number_format($sale['engine_cc']) . ' cc' : '—';
-    if (!empty($sale['engine_hp'])) {
-        $engine .= ' · ' . (int) $sale['engine_hp'] . ' hp';
+    if (stHp($sale)) {                   // not the kei cars' four-digit figure - see stHp()
+        $engine .= ' · ' . stHp($sale) . ' hp';
     }
     // [label, value, extra class] - the auction detail's spec strip, same markup
     $specs = array(
@@ -160,7 +160,7 @@ require_once 'includes/header.php';
               $out['sold'] ? 'is-final' : 'is-status'),
         array('Year', $sale['year'] ? (int) $sale['year'] : '—', ''),
         array('Chassis (model code)', $code !== '' ? $code : '—', ''),
-        array('Model grade', $sale['model_grade'] ?: '—', ''),
+        array('Model grade', stText($sale['model_grade']) ?: '—', ''),
         // The gearbox and the equipment are stored under each other's names - see
         // STAT_COL_TRANS / STAT_COL_EQUIP in statistics-lib.php.
         array('Engine', $engine, ''),
@@ -177,7 +177,7 @@ require_once 'includes/header.php';
       <h1><?php echo sanitize($title); ?><?php
         if ($sale['year']): ?> <i><?php echo (int) $sale['year']; ?></i><?php endif; ?></h1>
       <span class="pb-lot-grade">
-        <?php echo sanitize(trim(($sale['model_grade'] ?: '') . ($code !== '' ? '  ·  ' . $code : ''), ' ·')); ?>
+        <?php echo sanitize(trim(stText($sale['model_grade'] ?: '') . ($code !== '' ? '  ·  ' . $code : ''), ' ·')); ?>
       </span>
     </div>
     <div class="pb-lot-mid">
