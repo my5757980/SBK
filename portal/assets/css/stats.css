@@ -94,8 +94,30 @@ a.st-sort.is-on{color:#b3651a}
 .st-per b{color:#1a2433}
 
 /* ---------- the average-price column: the 13th, after Result ----------------- */
-.lot-table-stats{min-width:1466px}
+.lot-table-stats{min-width:1506px}
 .lot-table-stats th:nth-child(13){width:130px}
+
+/* ---------- the pictures cell holds all three pictures, whatever their shape ----
+   The owner, 25 September 2026: "the hall's data sits on top of the pictures".
+   Three pictures a lot at a height of 50: two photographs, 66 wide, and the
+   inspection sheet - portrait (33) at most halls but LANDSCAPE (66) at some, ISUZU
+   Kyushu among them. The table's layout is fixed, so the 186px column could not
+   grow: the third picture spilled out across "Sold on / Hall" and lay over its date
+   and hall name. 3 x 66 + two 4px gaps + the cell's 9px each side = 224. And if a
+   lot ever brings a wider or a fourth picture, it is cut at the column's edge -
+   never laid over the next column again. */
+.lot-table-stats th:nth-child(1){width:226px}
+.lot-table-stats td.c-shot{overflow:hidden}
+
+/* ---------- the table scrolls in its own box, at every width -------------------
+   style.css lets the table's box overflow from 1340px up, so the AUCTION list's
+   heading can stay pinned while the page scrolls - that table fits there. This one
+   (1,506px) is wider than the page's column (1,312px) at every width, so there it
+   pushed the WHOLE page sideways on 1366 and 1440 screens and cut the Average
+   column off at the window's edge. The Statistics box always scrolls instead; its
+   heading cannot stay pinned inside a scrolling box, so it scrolls with the rows. */
+.lot-table-wrap.st-wrap{overflow-x:auto}
+.st-wrap .lot-table thead th{position:static}
 .c-avg b{display:block;font-size:13px;color:#1a2433}
 .c-avg .sub{display:block}
 .st-spark{display:flex;align-items:flex-end;gap:2px;height:26px;margin-top:4px}

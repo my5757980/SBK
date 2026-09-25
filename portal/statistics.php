@@ -600,7 +600,7 @@ require_once 'includes/header.php';
       <a href="welcome.php" class="btn btn-primary">Browse the auctions</a>
     </div>
   <?php else: ?>
-    <div class="lot-table-wrap">
+    <div class="lot-table-wrap st-wrap">
       <table class="lot-table lot-table-stats">
         <thead>
           <tr>
