@@ -230,6 +230,28 @@ if (isset($_GET['csv']) && isAdmin() && $haveTable) {
  * dashboards. The session is closed for writing here too - nothing below is
  * written to it - so the two requests never queue behind each other again.
  */
+/* One page of the list as sale ids, in the list's order - what a sale's own page
+   steps through with Prev / Next, as the source's detail page does. The same
+   filters, order and page size as the list the reader came from. */
+if (isset($_GET['ids'])) {
+    if (function_exists('session_write_close')) { session_write_close(); }
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    $ids = array();
+    $pg  = max(1, (int) ($_GET['page'] ?? 1));
+    if ($haveTable) {
+        $st = $conn->prepare("SELECT stat_id FROM car_stats WHERE $where_sql ORDER BY $orderBy LIMIT ? OFFSET ?");
+        if ($st) {
+            $p2 = $params; $p2[] = $per_page; $p2[] = ($pg - 1) * $per_page;
+            $st->bind_param($types . 'ii', ...$p2);
+            $st->execute();
+            foreach ($st->get_result()->fetch_all() as $r) { $ids[] = $r[0]; }
+            $st->close();
+        }
+    }
+    echo json_encode(array('ids' => $ids, 'page' => $pg));
+    exit;
+}
 if (isset($_GET['count'])) {
     if (function_exists('session_write_close')) { session_write_close(); }
     header('Content-Type: application/json; charset=utf-8');
