@@ -93,7 +93,7 @@ if (isset($blank[$sort])) {
     $orderBy = $blank[$sort] . ' ASC, ' . $orderBy;
 }
 
-$where  = array('1=1');
+$where  = array(stWindowSql());      // only what the source shows - see STAT_WINDOW_DAYS
 $params = array();
 $types  = '';
 
@@ -266,11 +266,11 @@ if ($haveTable) {
     /* Unfiltered, these three figures are a count and an average over the whole
        million-row table - about a second - and they move by a few rows a minute.
        Kept sixty seconds; a filtered list always counts afresh. */
-    $plain = ($where_sql === '1=1');
-    $cachedTotals = $plain ? stCached('totals', 60, function () use ($conn) {
-        $n = (int) $conn->query("SELECT COUNT(*) FROM car_stats")->fetch_row()[0];
+    $plain = ($where_sql === stWindowSql());
+    $cachedTotals = $plain ? stCached('totals-w', 60, function () use ($conn) {
+        $n = (int) $conn->query("SELECT COUNT(*) FROM car_stats WHERE " . stWindowSql())->fetch_row()[0];
         $g = $conn->query("SELECT COUNT(*) n, AVG(final_price) a FROM car_stats
-                            WHERE final_price > 0 AND " . STAT_SOLD_SQL)->fetch_assoc();
+                            WHERE final_price > 0 AND " . STAT_SOLD_SQL . " AND " . stWindowSql())->fetch_assoc();
         return array('total' => $n, 'sold' => (int) $g['n'], 'avg' => $g['a'] !== null ? (float) $g['a'] : null);
     }) : null;
     /* Filtered: the count, how many of them sold, and their average - ONE pass
@@ -320,10 +320,10 @@ if ($haveTable) {
     }
 
     // A GROUP BY over a million rows for a list that changes slowly: kept ten minutes.
-    $makers = stCached('makers', 600, function () use ($conn) {
+    $makers = stCached('makers-w', 600, function () use ($conn) {
         $out = array();
         if ($res = @$conn->query(
-            "SELECT maker, COUNT(*) n FROM car_stats WHERE maker <> ''
+            "SELECT maker, COUNT(*) n FROM car_stats WHERE maker <> '' AND " . stWindowSql() . "
               GROUP BY maker ORDER BY maker ASC")) {
             while ($w = $res->fetch_assoc()) { $out[] = $w; }
         }
@@ -350,7 +350,7 @@ if ($haveTable) {
                        AVG(final_price) OVER (PARTITION BY chassis) av
                   FROM car_stats
                  WHERE chassis IN ($ph) AND final_price > 0 AND " . STAT_SOLD_SQL . "
-                   AND sold_on >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH)) x
+                   AND " . stWindowSql() . ") x
              WHERE rn <= 10");
         if ($st) {
             $st->bind_param(str_repeat('s', count($codes)), ...$codes);

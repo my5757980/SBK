@@ -17,7 +17,7 @@
  * sold; the start and final price and what the result really was (see
  * stOutcome() - the source answers in English and in Spanish); every detail the
  * source gives; and the same model code's other sales, with what it has fetched
- * over the last six months - which is what a buyer opens a past sale to learn.
+ * over the source's window (about three months) - which is what a buyer opens a past sale to learn.
  */
 
 require_once 'includes/config.php';
@@ -30,7 +30,8 @@ $id   = strtolower(trim((string) ($_GET['id'] ?? '')));
 $conn = getDatabaseConnection();
 $sale = null;
 if ($conn && preg_match('/^[a-f0-9]{32}$/', $id)) {
-    $st = $conn->prepare("SELECT * FROM car_stats WHERE stat_id = ?");
+    // A sale the source has already dropped is not shown either - the same window as the list.
+    $st = $conn->prepare("SELECT * FROM car_stats WHERE stat_id = ? AND " . stWindowSql());
     if ($st) {
         $st->bind_param('s', $id);
         $st->execute();
@@ -70,7 +71,7 @@ if ($sale && $conn && $code !== '') {
         "SELECT stat_id, sold_on, auction, lot_no, year, mileage, rating, colour,
                 start_price, final_price, result
            FROM car_stats
-          WHERE chassis = ? AND stat_id <> ?
+          WHERE chassis = ? AND stat_id <> ? AND " . stWindowSql() . "
           ORDER BY sold_on DESC, auction ASC, lot_no ASC
           LIMIT 12");
     if ($st) {
@@ -83,7 +84,7 @@ if ($sale && $conn && $code !== '') {
         "SELECT COUNT(*) n, AVG(final_price) a, MIN(final_price) lo, MAX(final_price) hi
            FROM car_stats
           WHERE chassis = ? AND final_price > 0 AND " . STAT_SOLD_SQL . "
-            AND sold_on >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)");
+            AND " . stWindowSql());
     if ($st) {
         $st->bind_param('s', $code);
         $st->execute();
@@ -93,7 +94,7 @@ if ($sale && $conn && $code !== '') {
             $summary = $g;
         }
     }
-    $st = $conn->prepare("SELECT COUNT(*) n FROM car_stats WHERE chassis = ?");
+    $st = $conn->prepare("SELECT COUNT(*) n FROM car_stats WHERE chassis = ? AND " . stWindowSql());
     if ($st) {
         $st->bind_param('s', $code);
         $st->execute();
@@ -129,7 +130,8 @@ require_once 'includes/header.php';
 
   <div class="sd-missing">
     <b>This sale is not in the statistics.</b>
-    <span>The link may be incomplete, or the record may have been replaced by a newer reading of the same lot.</span>
+    <span>Statistics cover the last three months of sales, as the source does - an older sale has left them.
+      The link may also be incomplete.</span>
     <a href="<?php echo sanitize($backUrl); ?>" class="btn btn-primary">Back to Statistics</a>
   </div>
 
@@ -245,7 +247,7 @@ require_once 'includes/header.php';
 
   <?php if ($summary): ?>
     <div class="sd-summary">
-      <span class="sd-summary-k"><?php echo sanitize($code); ?>, last six months</span>
+      <span class="sd-summary-k"><?php echo sanitize($code); ?>, last three months</span>
       <span><b><?php echo number_format((int) $summary['n']); ?></b> sold</span>
       <span>average <b>&yen;<?php echo number_format(round($summary['a'])); ?></b></span>
       <span>from &yen;<?php echo number_format($summary['lo']); ?> to &yen;<?php echo number_format($summary['hi']); ?></span>

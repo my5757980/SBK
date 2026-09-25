@@ -109,6 +109,23 @@ function stSold($row) {
 const STAT_SOLD_SQL   = "(result LIKE 'sold%' OR result LIKE 'vendido%')";
 const STAT_UNSOLD_SQL = "(result LIKE 'not sold%' OR result LIKE 'no se vend%')";
 
+/* WHAT THE SOURCE SHOWS, AND ONLY THAT (the owner, 25 September 2026: "the way
+   the website's statistics work - exactly that, everywhere in the portal").
+   The source keeps a rolling window: about three months of sale days, 93 days
+   back from today in Japan (on 19 September its oldest day was 18 June), and it
+   drops its oldest day every day. The portal kept every row it had ever read,
+   back to 13 June, so its count went past the source's (1,214,932 against
+   1,212,906) while it was still about 1.1 lakh short INSIDE the window. Every
+   figure and list a person sees now comes from the same window; older rows stay
+   in the table, out of sight. The fetcher's counts (aaa-stats-ingest.php ?have=)
+   are not windowed - it always names its own dates. */
+const STAT_WINDOW_DAYS = 93;
+
+/** The window as a condition: the sale day, by Japan's calendar. sold_on is indexed. */
+function stWindowSql($col = 'sold_on') {
+    return $col . ' >= DATE_SUB(DATE(UTC_TIMESTAMP() + INTERVAL 9 HOUR), INTERVAL ' . (int) STAT_WINDOW_DAYS . ' DAY)';
+}
+
 /* ------------------------------------------------ the source's ADVANCED SEARCH
  * The client, 24 September 2026: "the source our Statistics come from has
  * filters we don't - make ours the same". aaajapan's statistics search offers,
@@ -176,13 +193,13 @@ function stCached($key, $ttl, $make) {
 
 /** Transmission, equipment and colour, most common first, with their counts. */
 function stFacets($conn) {
-    return stCached('facets', 3600, function () use ($conn) {
+    return stCached('facets-w', 3600, function () use ($conn) {
         $out = array('trans' => array(), 'equip' => array(), 'colour' => array());
         $want = array('trans' => array(STAT_COL_TRANS, 30), 'equip' => array(STAT_COL_EQUIP, 16),
                       'colour' => array('colour', 30));
         foreach ($want as $k => $w) {
             $r = @$conn->query("SELECT {$w[0]} v, COUNT(*) n FROM car_stats
-                                 WHERE {$w[0]} IS NOT NULL AND {$w[0]} <> ''
+                                 WHERE {$w[0]} IS NOT NULL AND {$w[0]} <> '' AND " . stWindowSql() . "
                                  GROUP BY {$w[0]} ORDER BY n DESC LIMIT " . (int) $w[1]);
             while ($r && $x = $r->fetch_assoc()) {
                 $out[$k][] = array((string) $x['v'], (int) $x['n']);
@@ -194,14 +211,14 @@ function stFacets($conn) {
 
 /**
  * The auction houses the way the source lays them out: under the weekday each
- * one sells on, with how many sales it had in the last three months. A house that
+ * one sells on, with how many sales it had in the source's window. A house that
  * sells on two days goes under the busier one.
  */
 function stHousesByDay($conn) {
-    return stCached('houses-by-day', 1800, function () use ($conn) {
+    return stCached('houses-by-day-w', 1800, function () use ($conn) {
         $best = array();
         $r = @$conn->query("SELECT auction, DAYOFWEEK(sold_on) d, COUNT(*) n FROM car_stats
-                             WHERE sold_on >= DATE_SUB(CURDATE(), INTERVAL 3 MONTH) AND auction <> ''
+                             WHERE " . stWindowSql() . " AND auction <> ''
                              GROUP BY auction, DAYOFWEEK(sold_on)");
         while ($r && $x = $r->fetch_assoc()) {
             $h = (string) $x['auction'];

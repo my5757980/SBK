@@ -1302,9 +1302,12 @@ function cacheGet($key, $ttl) {
  */
 function statsCount() {
     global $conn;
+    // The same window as the Statistics page itself (STAT_WINDOW_DAYS), so the
+    // dashboards' figure and the page's headline stay one number.
+    require_once __DIR__ . '/statistics-lib.php';
     $n = 0;
     if ($r = @$conn->query("SHOW TABLES LIKE 'car_stats'")) {
-        if ($r->num_rows && $q = @$conn->query("SELECT COUNT(*) FROM car_stats")) {
+        if ($r->num_rows && $q = @$conn->query("SELECT COUNT(*) FROM car_stats WHERE " . stWindowSql())) {
             $n = (int) $q->fetch_row()[0];
         }
     }
