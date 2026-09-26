@@ -180,6 +180,9 @@ a.st-sort.is-on{color:#b3651a}
 .sd2-icon svg{width:46px;height:46px;color:#5d6b7c}
 .sd2-icon:hover svg,.sd2-icon.is-on svg{color:#c62828}
 .sd2-panel{margin:0 0 16px}
+/* "Details of vehicle", on the page without a button (26 Sep 2026) */
+.sd2-panel.is-open{margin:16px 0 18px}
+.sd2-panel-h{color:#3f6ea8;font-size:12.5px;font-weight:700;text-transform:uppercase;margin:0 0 8px}
 
 .sd2-body.lot-shots{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:22px;align-items:start}
 .sd2-photos{display:flex;flex-direction:column;gap:8px}
