@@ -6,9 +6,8 @@
  * page isn't showing up - add the detail page", and, again, "don't touch the
  * auction module at all". So this page reads ONLY the statistics table
  * (car_stats) through the Statistics library; nothing of the auction is changed
- * for it. It reuses, unchanged, two of the auction page's tools that site.js
- * already runs on any page carrying their markup: the month-of-production
- * lookup and the FOB calculator.
+ * for it. It reuses, unchanged, one of the auction page's tools that site.js
+ * already runs on any page carrying its markup: the month-of-production lookup.
  *
  * THE SOURCE'S OWN LAYOUT (the owner, 25 September 2026: "make the detail page
  * exactly like the statistics site's - its data, its UI/UX"). Read off one of
@@ -17,8 +16,8 @@
  *   - the sale as ONE row under the list's own headings - lot number (copy
  *     info), auction date and hall, model and year, chassis, engine and
  *     equipment, mileage and condition, start and sold-for, average price;
- *   - four buttons: details of vehicle, sales statistics, cars catalogue, cars
- *     calculator;
+ *   - its buttons - of the source's four, only "details of vehicle" is kept
+ *     (the owner, 26 September 2026);
  *   - the two photographs large on the left; on the right the month of
  *     production, the auction sheet large, the sheet's codes spelled out and
  *     a description.
@@ -163,9 +162,6 @@ require_once 'includes/header.php';
     // Month of production: the same lookup the auction's car page has (site.js).
     $vinMakers = array('DAIHATSU', 'HONDA', 'ISUZU', 'MAZDA', 'MITSUBISHI', 'NISSAN', 'SUBARU', 'SUZUKI', 'TOYOTA');
     $vinMake   = in_array(strtoupper((string) $sale['maker']), $vinMakers, true) ? strtoupper((string) $sale['maker']) : '';
-    $catalogue = 'index.php?make=' . rawurlencode((string) $sale['maker']) . '&model=' . rawurlencode((string) $sale['model']);
-    $salesUrl  = $code !== '' ? 'statistics.php?chassis=' . rawurlencode($code)
-                              : 'statistics.php?maker=' . rawurlencode((string) $sale['maker']) . '&model=' . rawurlencode((string) $sale['model']);
 ?>
 
   <?php // ---------------------------------------------- Home / Close / Prev / Next ?>
@@ -226,20 +222,14 @@ require_once 'includes/header.php';
     </div>
   </div>
 
-  <?php // ---------------------------------------------- the four buttons ?>
+  <?php // ------------------------------------ "Details of vehicle"
+        // The source has four buttons here; the owner, 26 September 2026, kept
+        // this one only - sales statistics, cars catalogue and cars calculator
+        // (and the calculator's panel) were taken off the page. ?>
   <div class="sd2-icons">
     <a href="#sdDetails" class="sd2-icon" data-panel="sdDetails">
       <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/><path d="M7.5 22h11M29.5 22h11M24 28v13" stroke="currentColor" stroke-width="3"/></svg>
       <span>Details<br>of vehicle</span></a>
-    <a href="<?php echo sanitize($salesUrl); ?>" class="sd2-icon">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="9" y="6" width="30" height="36" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M15 34v-6M21 34V20M27 34v-9M33 34V15" stroke="currentColor" stroke-width="3"/></svg>
-      <span>Sales<br>statistics</span></a>
-    <a href="<?php echo sanitize($catalogue); ?>" class="sd2-icon" title="This model in the auction now">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="8" y="8" width="32" height="32" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><path d="M14 30l4-8h12l4 8M13 30h22v4H13zM16 17h16" stroke="currentColor" stroke-width="3" fill="none"/></svg>
-      <span>Cars<br>catalogue</span></a>
-    <a href="#sdCalc" class="sd2-icon" data-panel="sdCalc">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="10" y="5" width="28" height="38" rx="3" fill="none" stroke="currentColor" stroke-width="3"/><rect x="15" y="10" width="18" height="8" fill="currentColor"/><path d="M16 25h3M23 25h3M30 25h3M16 31h3M23 31h3M30 31h3M16 37h3M23 37h3M30 37h3" stroke="currentColor" stroke-width="3"/></svg>
-      <span>Cars<br>calculator</span></a>
   </div>
 
   <?php // "Details of vehicle": every field the source gives, the auction page's strip. ?>
@@ -254,36 +244,6 @@ require_once 'includes/header.php';
     </div>
   </div>
 
-  <?php // "Cars calculator": the auction page's FOB calculator, the sale's price in it. ?>
-  <div class="sd2-panel" id="sdCalc" hidden>
-    <div class="panel pb-fob" id="fob">
-      <h3>FOB price</h3>
-      <table class="pb-fob-t">
-        <tr class="h"><th>Description</th><th>JPY</th></tr>
-        <tr>
-          <td>Bidding amount (this car sold for)</td>
-          <td><input type="number" id="fobBid" value="<?php echo (int) ($final ?: ($start ?: 100000)); ?>" step="1000"></td>
-        </tr>
-        <tr class="h2"><td colspan="2">Choose Vehicle</td></tr>
-        <tr><td colspan="2"><label class="pb-rd"><input type="radio" name="fobKind" value="car" checked> Passenger Car, SUV and Van</label></td></tr>
-        <tr><td colspan="2"><label class="pb-rd"><input type="radio" name="fobKind" value="truck"> Truck, Big Truck</label></td></tr>
-        <tr><td>Domestic Transportation Fee</td><td><input type="number" class="fobN is-fixed" id="fobTransport" readonly tabindex="-1" value="15000"></td></tr>
-        <tr><td>Custom Clearance</td><td><input type="number" class="fobN is-fixed" id="fobClearance" readonly tabindex="-1" value="20000"></td></tr>
-        <tr>
-          <td>Inspection
-            <select id="fobInspect"><option value="0">None</option><option value="15000">JAAI</option><option value="20000">JEVIC</option></select>
-          </td>
-          <td><span class="fobOut" id="fobInspectOut">0</span></td>
-        </tr>
-        <tr><td>L/C <input type="checkbox" id="fobLc" data-fee="8000"></td><td><span class="fobOut" id="fobLcOut">0</span></td></tr>
-        <tr><td>Vanning Charges <input type="checkbox" id="fobVan" data-fee="12000"></td><td><span class="fobOut" id="fobVanOut">0</span></td></tr>
-        <tr><td>Radiation</td><td><input type="number" class="fobN is-fixed" id="fobRadiation" readonly tabindex="-1" value="1500"></td></tr>
-        <tr><td>Range 10</td><td><input type="number" class="fobN is-fixed" id="fobRange" readonly tabindex="-1" value="20000"></td></tr>
-        <tr class="tot"><td>FOB Cost :</td><td><span id="fobTotal">0</span></td></tr>
-      </table>
-      <p class="pb-fob-note">Indicative only. Auction charges are quoted by the desk on the day.</p>
-    </div>
-  </div>
 
   <?php // ---------------------------------------------- photographs | sheet
         // `lot-shots` is what tells site.js's viewer which pictures are one car's:
