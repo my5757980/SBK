@@ -64,6 +64,8 @@ a.st-open:focus-visible{outline:2px solid #0370cd;outline-offset:2px;border-radi
 .st-adv[open] > summary::before{transform:rotate(90deg)}
 .st-adv-on{font-size:11px;font-weight:700;color:#fff;background:#b3651a;border-radius:100px;padding:2px 8px}
 .st-adv-body{padding:4px 14px 14px;border-top:1px solid #ece9e2}
+/* on the page, no dropdown above it (26 Sep 2026) */
+.st-adv-open .st-adv-body{border-top:0;padding-top:8px}
 
 .st-adv-houses{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:4px 18px;

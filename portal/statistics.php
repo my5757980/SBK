@@ -510,10 +510,10 @@ require_once 'includes/header.php';
              halls under the weekday each one sells on, with its count over the
              last three months; the four from-to ranges; transmission, equipment
              and colour; and the condition grades as the source's own row of
-             boxes. A native <details>, so it opens without any script, and it
-             opens by itself whenever one of its filters is in use. */ ?>
-    <details class="st-adv"<?php echo $advOn ? ' open' : ''; ?>>
-      <summary>Advanced search<?php if ($advOn): ?> <span class="st-adv-on">in use</span><?php endif; ?></summary>
+             boxes. On the page itself, always in view - it sat inside an "Advanced
+             search" dropdown until the owner asked, 26 September 2026, for it to
+             come out of the dropdown and stay. */ ?>
+    <div class="st-adv st-adv-open">
       <div class="st-adv-body">
         <?php if (!empty($housesByDay)): ?>
           <div class="st-adv-houses">
@@ -575,7 +575,7 @@ require_once 'includes/header.php';
           <a href="statistics.php" class="btn btn-ghost">Clear everything</a>
         </div>
       </div>
-    </details>
+    </div>
   </form>
 
   <?php // The count stays visible even at zero so the live poll has something to
