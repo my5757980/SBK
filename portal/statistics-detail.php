@@ -16,8 +16,9 @@
  *   - the sale as ONE row under the list's own headings - lot number (copy
  *     info), auction date and hall, model and year, chassis, engine and
  *     equipment, mileage and condition, start and sold-for, average price;
- *   - its buttons - of the source's four, only "details of vehicle" is kept
- *     (the owner, 26 September 2026);
+ *   - of the source's four buttons, only "details of vehicle" was kept, and
+ *     then shown on the page itself instead of behind a click (the owner,
+ *     26 September 2026);
  *   - the two photographs large on the left; on the right the month of
  *     production, the auction sheet large, the sheet's codes spelled out and
  *     a description.
@@ -223,17 +224,13 @@ require_once 'includes/header.php';
   </div>
 
   <?php // ------------------------------------ "Details of vehicle"
-        // The source has four buttons here; the owner, 26 September 2026, kept
-        // this one only - sales statistics, cars catalogue and cars calculator
-        // (and the calculator's panel) were taken off the page. ?>
-  <div class="sd2-icons">
-    <a href="#sdDetails" class="sd2-icon" data-panel="sdDetails">
-      <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="17" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="24" cy="24" r="4" fill="currentColor"/><path d="M7.5 22h11M29.5 22h11M24 28v13" stroke="currentColor" stroke-width="3"/></svg>
-      <span>Details<br>of vehicle</span></a>
-  </div>
-
-  <?php // "Details of vehicle": every field the source gives, the auction page's strip. ?>
-  <div class="sd2-panel" id="sdDetails" hidden>
+        // Every field the source gives, the auction page's strip - always on the
+        // page. The source has four buttons here; the owner, 26 September 2026,
+        // took three off (sales statistics, cars catalogue, cars calculator) and
+        // then had this one's panel shown without a click, as the Statistics
+        // list's advanced search was taken out of its dropdown. ?>
+  <div class="sd2-panel is-open" id="sdDetails">
+    <div class="sd2-panel-h">Details of vehicle</div>
     <div class="pb-specs">
       <?php foreach ($specs as $s): ?>
         <div class="pb-spec <?php echo $s[2]; ?>">
@@ -335,7 +332,7 @@ require_once 'includes/header.php';
 </main>
 
 <script>
-/* copy info, the icon panels, and Prev / Next through the list the reader came from */
+/* copy info, and Prev / Next through the list the reader came from */
 (function () {
   var c = document.getElementById('sdCopy');
   if (c) {
@@ -348,17 +345,6 @@ require_once 'includes/header.php';
              try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(a); done(); }
     });
   }
-  document.querySelectorAll('.sd2-icon[data-panel]').forEach(function (b) {
-    b.addEventListener('click', function (ev) {
-      ev.preventDefault();
-      var p = document.getElementById(b.getAttribute('data-panel'));
-      if (!p) { return; }
-      p.hidden = !p.hidden;
-      b.classList.toggle('is-on', !p.hidden);
-      if (!p.hidden) { p.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
-    });
-  });
-
   var nav = document.getElementById('sdNav');
   if (!nav || !window.fetch || !window.URLSearchParams) { return; }
   var id = nav.getAttribute('data-id'), back = nav.getAttribute('data-back') || '';
