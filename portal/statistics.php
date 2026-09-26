@@ -351,7 +351,8 @@ if ($haveTable) {
         }
         return $out;
     });
-    $housesByDay = stHousesByDay($conn);
+    $housesByDay = array();              // the halls' boxes are off the page (26 Sep 2026)
+    $facets      = stFacets($conn);
 
     /* THE AVERAGE-PRICE COLUMN, as the source has it: for each row, what the same
        model code sold for over the last three months - the average, how many, and
@@ -505,31 +506,57 @@ require_once 'includes/header.php';
       <input type="hidden" name="per" value="<?php echo (int) $per_page; ?>">
     <?php endif; ?>
 
-    <?php /* THE HALLS, under the weekday each one sells on, with its count in the
-             source's window - ticked here, applied by the Search button above.
-             On 26 September 2026 the owner took this out of its "Advanced search"
-             dropdown, and then took away the rest of that panel: the four from-to
-             ranges, transmission, equipment, colour and the condition boxes. The
-             list still understands those filters in its address (an old link keeps
-             working, and Reset above clears it); nothing on the page offers them. */ ?>
+    <?php /* THE SOURCE'S ADVANCED SEARCH, less the halls (the owner, 26 September
+             2026): the four from-to ranges; transmission, equipment and colour; the
+             condition grades as the source's own row of boxes; Search and Clear.
+             On the page itself, not in a dropdown. The halls-by-weekday boxes were
+             taken off the page; the list still understands houses[] in its address
+             (an old link keeps working, Reset clears it). */ ?>
     <div class="st-adv st-adv-open">
       <div class="st-adv-body">
-        <?php if (!empty($housesByDay)): ?>
-          <div class="st-adv-houses">
-            <?php foreach ($housesByDay as $grp): ?>
-              <div class="st-day">
-                <b><?php echo sanitize($grp['day']); ?></b>
-                <?php foreach ($grp['houses'] as $h): ?>
-                  <label class="st-chk">
-                    <input type="checkbox" name="houses[]" value="<?php echo sanitize($h[0]); ?>"<?php
-                      echo in_array($h[0], $houses, true) ? ' checked' : ''; ?>>
-                    <?php echo sanitize($h[0]); ?> <i>(<?php echo number_format($h[1]); ?>)</i>
-                  </label>
-                <?php endforeach; ?>
+        <div class="st-adv-grid">
+          <div class="st-ranges">
+            <?php foreach (array('km' => 'Mileage (km)', 'cc' => 'Engine (cc)', 'sp' => 'Start price (&yen;)',
+                                 'fp' => 'Final price (&yen;)') as $rk => $rl): ?>
+              <div class="st-range">
+                <span><?php echo $rl; ?></span>
+                <input type="text" inputmode="numeric" name="<?php echo $rk; ?>1" class="input" placeholder="from"
+                       value="<?php echo sanitize($ranges[$rk][1]); ?>">
+                <input type="text" inputmode="numeric" name="<?php echo $rk; ?>2" class="input" placeholder="to"
+                       value="<?php echo sanitize($ranges[$rk][2]); ?>">
+              </div>
+            <?php endforeach; ?>
+            <?php foreach (array('trans' => array('Transmission', $trans), 'equip' => array('Equipment', $equip),
+                                 'colour' => array('Colour', $colour)) as $fk => $fl): ?>
+              <div class="st-range">
+                <span><?php echo $fl[0]; ?></span>
+                <select name="<?php echo $fk; ?>" class="select">
+                  <option value="">Any</option>
+                  <?php foreach (($facets[$fk] ?? array()) as $fv): ?>
+                    <option value="<?php echo sanitize($fv[0]); ?>"<?php echo $fl[1] === $fv[0] ? ' selected' : ''; ?>>
+                      <?php echo sanitize($fv[0]) . ' (' . number_format($fv[1]) . ')'; ?>
+                    </option>
+                  <?php endforeach; ?>
+                </select>
               </div>
             <?php endforeach; ?>
           </div>
-        <?php endif; ?>
+          <div class="st-grades">
+            <b>Condition</b>
+            <div class="st-grade-set">
+              <?php foreach (STAT_GRADES as $g): ?>
+                <label class="st-chk st-g">
+                  <input type="checkbox" name="grades[]" value="<?php echo sanitize($g); ?>"<?php
+                    echo in_array($g, $grades, true) ? ' checked' : ''; ?>> <?php echo sanitize($g); ?>
+                </label>
+              <?php endforeach; ?>
+            </div>
+          </div>
+        </div>
+        <div class="st-adv-do">
+          <button type="submit" class="btn btn-dark">Search</button>
+          <a href="statistics.php" class="btn btn-ghost">Clear everything</a>
+        </div>
       </div>
     </div>
   </form>
