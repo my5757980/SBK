@@ -352,7 +352,6 @@ if ($haveTable) {
         return $out;
     });
     $housesByDay = stHousesByDay($conn);
-    $facets      = stFacets($conn);
 
     /* THE AVERAGE-PRICE COLUMN, as the source has it: for each row, what the same
        model code sold for over the last three months - the average, how many, and
@@ -506,13 +505,13 @@ require_once 'includes/header.php';
       <input type="hidden" name="per" value="<?php echo (int) $per_page; ?>">
     <?php endif; ?>
 
-    <?php /* THE SOURCE'S ADVANCED SEARCH (the client, 24 September 2026). The
-             halls under the weekday each one sells on, with its count over the
-             last three months; the four from-to ranges; transmission, equipment
-             and colour; and the condition grades as the source's own row of
-             boxes. On the page itself, always in view - it sat inside an "Advanced
-             search" dropdown until the owner asked, 26 September 2026, for it to
-             come out of the dropdown and stay. */ ?>
+    <?php /* THE HALLS, under the weekday each one sells on, with its count in the
+             source's window - ticked here, applied by the Search button above.
+             On 26 September 2026 the owner took this out of its "Advanced search"
+             dropdown, and then took away the rest of that panel: the four from-to
+             ranges, transmission, equipment, colour and the condition boxes. The
+             list still understands those filters in its address (an old link keeps
+             working, and Reset above clears it); nothing on the page offers them. */ ?>
     <div class="st-adv st-adv-open">
       <div class="st-adv-body">
         <?php if (!empty($housesByDay)): ?>
@@ -531,49 +530,6 @@ require_once 'includes/header.php';
             <?php endforeach; ?>
           </div>
         <?php endif; ?>
-        <div class="st-adv-grid">
-          <div class="st-ranges">
-            <?php foreach (array('km' => 'Mileage (km)', 'cc' => 'Engine (cc)', 'sp' => 'Start price (&yen;)',
-                                 'fp' => 'Final price (&yen;)') as $rk => $rl): ?>
-              <div class="st-range">
-                <span><?php echo $rl; ?></span>
-                <input type="text" inputmode="numeric" name="<?php echo $rk; ?>1" class="input" placeholder="from"
-                       value="<?php echo sanitize($ranges[$rk][1]); ?>">
-                <input type="text" inputmode="numeric" name="<?php echo $rk; ?>2" class="input" placeholder="to"
-                       value="<?php echo sanitize($ranges[$rk][2]); ?>">
-              </div>
-            <?php endforeach; ?>
-            <?php foreach (array('trans' => array('Transmission', $trans), 'equip' => array('Equipment', $equip),
-                                 'colour' => array('Colour', $colour)) as $fk => $fl): ?>
-              <div class="st-range">
-                <span><?php echo $fl[0]; ?></span>
-                <select name="<?php echo $fk; ?>" class="select">
-                  <option value="">Any</option>
-                  <?php foreach (($facets[$fk] ?? array()) as $fv): ?>
-                    <option value="<?php echo sanitize($fv[0]); ?>"<?php echo $fl[1] === $fv[0] ? ' selected' : ''; ?>>
-                      <?php echo sanitize($fv[0]) . ' (' . number_format($fv[1]) . ')'; ?>
-                    </option>
-                  <?php endforeach; ?>
-                </select>
-              </div>
-            <?php endforeach; ?>
-          </div>
-          <div class="st-grades">
-            <b>Condition</b>
-            <div class="st-grade-set">
-              <?php foreach (STAT_GRADES as $g): ?>
-                <label class="st-chk st-g">
-                  <input type="checkbox" name="grades[]" value="<?php echo sanitize($g); ?>"<?php
-                    echo in_array($g, $grades, true) ? ' checked' : ''; ?>> <?php echo sanitize($g); ?>
-                </label>
-              <?php endforeach; ?>
-            </div>
-          </div>
-        </div>
-        <div class="st-adv-do">
-          <button type="submit" class="btn btn-dark">Search</button>
-          <a href="statistics.php" class="btn btn-ghost">Clear everything</a>
-        </div>
       </div>
     </div>
   </form>
