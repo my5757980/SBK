@@ -66,22 +66,32 @@ foreach (array('km' => 'mileage', 'cc' => 'engine_cc', 'sp' => 'start_price', 'f
 $advOn = ($houses || $grades || $trans !== '' || $equip !== '' || $colour !== ''
           || array_filter($ranges, function ($r) { return $r[1] !== '' || $r[2] !== ''; }));
 
-/* Every column sorts, both ways, as on the source. The key is looked up here, so
-   only these expressions ever reach ORDER BY. */
+/* Every column sorts, both ways. The key is looked up here, so only these
+   expressions ever reach ORDER BY; `%s` is where the direction goes.
+
+   ONE RULE FOR EVERY COLUMN (the client, 27 September 2026): a column sorts
+   DESCENDING first - the highest price, the biggest engine, the newest day at the
+   top - and a click on its label turns it ascending, and back. Until then each
+   column had its own first direction: Hall, Lot, Model, Chassis, Mileage and
+   Condition opened lowest-first while the prices opened highest-first.
+
+   The condition grade reads as a number where it is one (6, 5, 4.5 ... 1) and
+   the letter grades (R, RA, S, ...) follow them either way - as text, "R" sorted
+   above "6" and a repaired car led the "highest" grades. */
 $SORTS = array(
-    'date'  => array('sold_on', 'DESC'),       'hall'  => array('auction', 'ASC'),
-    'lot'   => array('CAST(lot_no AS UNSIGNED)', 'ASC'),
-    'model' => array('maker %s, model', 'ASC'), 'year'  => array('year', 'DESC'),
-    'chassis' => array('chassis', 'ASC'),      'cc'    => array('engine_cc', 'DESC'),
-    'km'    => array('mileage', 'ASC'),        'grade' => array('rating', 'ASC'),
-    'start' => array('start_price', 'DESC'),   'final' => array('final_price', 'DESC'),
+    'date'    => 'sold_on %s',               'hall'  => 'auction %s',
+    'lot'     => 'CAST(lot_no AS UNSIGNED) %s',
+    'model'   => 'maker %s, model %s',        'year'  => 'year %s',
+    'chassis' => 'chassis %s',                'cc'    => 'engine_cc %s',
+    'km'      => 'mileage %s',
+    'grade'   => "(rating REGEXP '^[0-9]+([.][0-9]*)?\$') DESC, CAST(rating AS DECIMAL(5,1)) %s, rating %s",
+    'start'   => 'start_price %s',            'final' => 'final_price %s',
 );
 $sort = (string) ($_GET['sort'] ?? 'date');
 if (!isset($SORTS[$sort])) { $sort = 'date'; }
 $dir = strtolower((string) ($_GET['dir'] ?? ''));
-$dir = ($dir === 'asc' || $dir === 'desc') ? strtoupper($dir) : $SORTS[$sort][1];
-$orderBy = sprintf(strpos($SORTS[$sort][0], '%s') !== false ? $SORTS[$sort][0] : $SORTS[$sort][0] . ' %s', $dir)
-         . ($sort === 'model' ? ' ' . $dir : '') . ', sold_on DESC, auction ASC, lot_no ASC';
+$dir = ($dir === 'asc') ? 'ASC' : 'DESC';               // descending unless ascending was asked for
+$orderBy = str_replace('%s', $dir, $SORTS[$sort]) . ', sold_on DESC, auction ASC, lot_no ASC';
 /* A blank or zero value says nothing, so it goes LAST whichever way a column is
    sorted - "mileage, lowest first" opened on thirty rows of dashes before this.
    (The date keeps its plain order, which an index serves.) */
@@ -403,13 +413,15 @@ function stQs($over = array()) {
     return 'statistics.php' . ($a ? '?' . preg_replace('/%5B\d+%5D=/', '%5B%5D=', http_build_query($a)) : '');
 }
 
-/** A column heading that sorts: first click the column's natural way, then flips. */
+/** A column heading that sorts: the first click descending (highest at the top),
+    each next click on the same label flips it - ascending, then descending again. */
 function stSortLink($key, $label) {
-    global $sort, $dir, $SORTS;
+    global $sort, $dir;
     $on   = ($sort === $key);
-    $next = $on ? ($dir === 'ASC' ? 'desc' : 'asc') : strtolower($SORTS[$key][1]);
+    $next = ($on && $dir === 'DESC') ? 'asc' : 'desc';
     $mark = $on ? ($dir === 'ASC' ? ' &#9650;' : ' &#9660;') : '';
-    return '<a class="st-sort' . ($on ? ' is-on' : '') . '" href="'
+    $tip  = $next === 'asc' ? 'Sort ascending - lowest first' : 'Sort descending - highest first';
+    return '<a class="st-sort' . ($on ? ' is-on' : '') . '" title="' . $tip . '" href="'
          . sanitize(stQs(array('sort' => $key, 'dir' => $next, 'page' => 1))) . '">' . $label . $mark . '</a>';
 }
 
