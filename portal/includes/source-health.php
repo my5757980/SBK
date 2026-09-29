@@ -31,6 +31,14 @@
  * Deliberately NOT red: a run that ends early because the day's allowance is
  * spent, one slow answer, one machine turned away at the door. None of those is
  * the ID, and a signal that cries wolf is soon ignored.
+ *
+ * Since 29 September 2026 the auction has a SECOND feed (spec 009): aaajapan's
+ * live auction, read by the same job on GitHub with the same ID as the
+ * statistics. The auction keeps ONE signal over both. The owner, the same day:
+ * when both are fine it says "Auction working" as before, no name; when one is
+ * not, it names the one at fault - "PB Auction not working", "aaajapan Auction
+ * not working" - so staff know which to look at. He chose this knowing the
+ * no-names rule; that red label (its hover, its JSON) is the one exception.
  */
 
 /** Where both feeds keep their notes - the account's home, outside every web root. */
@@ -182,8 +190,94 @@ function sourceHealthStatistics($file = null) {
         . 'did not need to sign in. Last report ' . sourceAgo($age) . '.' . $signed, (int) $h['at']);
 }
 
+/**
+ * The auction's second feed: aaajapan's live auction (spec 009). The same job on
+ * GitHub reads it with the same ID as the statistics, and its end-of-run report
+ * carries an `auction` block: the mode the pass runs in, when a pass last ended
+ * clean (ok_at) and the last pass's fault.
+ *
+ * Red when the shared ID is in trouble (the statistics' own rules), when the pass
+ * is switched off or only counting, or when no pass has ended clean for three
+ * hours: it looks every 30 minutes while Japan's halls sell and every 90 otherwise,
+ * at the start of a run (~20 minutes), so three hours is not a hiccup. One failed
+ * pass is not red - the next usually goes through - nor is a spent allowance.
+ */
+function sourceHealthAuctionB($file = null) {
+    $file = $file ?: sourceHome() . '/aaa-fetch/health.json';   // a test hands in a file of its own
+    $id = sourceHealthStatistics($file);
+    if (!$id['ok']) {
+        return sourceState(false, 'account',
+            'It signs in with the same ID as the statistics, and that ID has a problem. ' . $id['detail'], $id['at']);
+    }
+    $h  = json_decode((string) @file_get_contents($file), true);
+    $au = (is_array($h) && isset($h['auction']) && is_array($h['auction'])) ? $h['auction'] : null;
+    if (!$au) {
+        return sourceState(false, 'noreport',
+            'Its fetcher has not reported on the auction. It does so at the end of every run, about every twenty minutes.',
+            (int) ($h['at'] ?? 0));
+    }
+    $now  = time();
+    $mode = (string) ($au['mode'] ?? '');
+    if ($mode !== 'read') {
+        return sourceState(false, $mode === 'survey' ? 'survey' : 'off',
+            $mode === 'survey' ? 'It is set only to count the lots, not to bring them in.'
+                               : 'It is switched off, so no lots come in.', (int) $h['at']);
+    }
+    $okAt   = (int) ($au['ok_at'] ?? 0);
+    $budget = (int) ($au['budget'] ?? 0);
+    $used   = (int) ($au['used'] ?? 0);
+    $share  = $budget > 0 ? ' Its share today: ' . number_format($used) . ' of ' . number_format($budget) . ' requests.' : '';
+    if (!$okAt || $now - $okAt > 3 * 3600) {
+        if (!empty($h['spent']) || ($budget > 0 && $used >= $budget)) {
+            return sourceState(true, 'spent',
+                'Today\'s allowance is used, so it rests until 00:00 UTC (05:00 in Pakistan).'
+                . ($okAt ? ' Last clean pass ' . sourceAgo($now - $okAt) . '.' : '') . $share, $okAt);
+        }
+        if (trim((string) ($au['err'] ?? '')) !== '') {
+            return sourceState(false, 'failing',
+                'Its passes over the auction keep stopping with a fault - the details are in the fetcher\'s log on GitHub.'
+                . ($okAt ? ' Last clean pass ' . sourceAgo($now - $okAt) . '.' : ''), $okAt);
+        }
+        return sourceState(false, 'notrunning',
+            'It has not been over the auction ' . ($okAt ? 'since ' . sourceAgo($now - $okAt) : 'yet')
+            . '. It looks every 30 to 90 minutes, when the statistics have nothing to ask.', $okAt);
+    }
+    return sourceState(true, 'ok',
+        'It is bringing lots in. Last clean pass ' . sourceAgo($now - $okAt) . ' (' . (int) ($au['halls'] ?? 0)
+        . ' halls read, ' . number_format((int) ($au['new'] ?? 0)) . ' new lots).' . $share, $okAt);
+}
+
+/**
+ * The auction's ONE signal over both feeds (the owner, 29 September 2026). Both
+ * fine: green "Auction working", no name anywhere. One not: red, and `name` - the
+ * label - says which: "PB Auction", "aaajapan Auction", "PB + aaajapan Auction".
+ * `a` and `b` keep each feed's own case for the tests and whoever fixes it.
+ */
+function sourceHealthAuctionAll($dir = null, $file = null) {
+    $a = sourceHealthAuction($dir);
+    $b = sourceHealthAuctionB($file);
+    $bad = array();
+    $why = array();
+    if (!$a['ok']) { $bad[] = 'PB';       $why[] = 'PB: ' . $a['detail']; }
+    if (!$b['ok']) { $bad[] = 'aaajapan'; $why[] = 'aaajapan: ' . $b['detail']; }
+    if (!$bad) {
+        $r = sourceState(true, 'ok', 'Both auction feeds are working. First feed: ' . $a['detail']
+                                   . ' Second feed: ' . $b['detail'], max($a['at'], $b['at']));
+    } else {
+        if (count($bad) === 1) {
+            $why[] = 'The other auction feed is working.';
+        }
+        $r = sourceState(false, count($bad) === 2 ? 'both' : strtolower($bad[0]), implode(' ', $why),
+                         $a['ok'] ? $b['at'] : $a['at']);
+    }
+    $r['name'] = $bad ? implode(' + ', $bad) . ' Auction' : 'Auction';
+    $r['a'] = $a['state'];
+    $r['b'] = $b['state'];
+    return $r;
+}
+
 function sourceHealthAll() {
-    return array('auction' => sourceHealthAuction(), 'statistics' => sourceHealthStatistics());
+    return array('auction' => sourceHealthAuctionAll(), 'statistics' => sourceHealthStatistics());
 }
 
 /**
@@ -194,8 +288,8 @@ function sourceSignal($which, $extraClass = '') {
     if (!function_exists('isAdmin') || !isAdmin()) {
         return '';
     }
-    $h = ($which === 'statistics') ? sourceHealthStatistics() : sourceHealthAuction();
-    $name  = ($which === 'statistics') ? 'Statistics' : 'Auction';
+    $h = ($which === 'statistics') ? sourceHealthStatistics() : sourceHealthAuctionAll();
+    $name  = ($which === 'statistics') ? 'Statistics' : $h['name'];
     $class = $h['ok'] ? 'is-ok' : 'is-bad';
     return '<span class="src-sig ' . $class . ($extraClass !== '' ? ' ' . $extraClass : '') . '" data-src="'
          . htmlspecialchars($which) . '" role="status" title="' . htmlspecialchars($h['detail']) . '">'

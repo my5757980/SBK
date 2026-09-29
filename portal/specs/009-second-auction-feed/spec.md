@@ -71,6 +71,13 @@ the customer's bids kept.
   read, or - on its sale day - to pick up results; pages at the Statistics' pace (1.5 s)
   under a daily sub-allowance inside today's 16,000; stop on the first refusal.
 - **FR-007** Nothing about the Statistics changes.
+- **FR-008** (owner, 29 Sep) The auction keeps ONE staff signal over both feeds: green
+  "Auction working" with no name while both work; red naming the feed at fault - "PB Auction
+  not working", "aaajapan Auction not working", "PB + aaajapan Auction not working". The
+  aaajapan feed is red when its shared ID is (the Statistics' rules), when it is switched
+  off / survey-only, or when no auction pass has ended clean for 3 hours (a spent allowance
+  is not red). The owner's chosen exception to the client's no-names rule of 24 Sep; the
+  Statistics signal is unchanged.
 
 ## Known limits (the source's, not choices)
 - An aaajapan lot has 3 pictures (PB's have 12 derived ones). Same page, fewer pictures.

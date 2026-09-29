@@ -21,6 +21,9 @@
       el.title = h.detail;
       var t = el.querySelector('.src-text');
       if (t) { t.textContent = h.text; }
+      // the auction's label names the feed at fault ("PB Auction", "aaajapan Auction")
+      var n = el.querySelector('.src-name');
+      if (n && h.name) { n.textContent = h.name; }
     }
   }
 
