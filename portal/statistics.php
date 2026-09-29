@@ -397,15 +397,19 @@ $halls  = array();
 
 if ($haveTable) {
     /* Unfiltered, these three figures are a count and an average over the whole
-       million-row table - about a second - and they move by a few rows a minute.
-       Kept sixty seconds; a filtered list always counts afresh. */
+       million-row table, and they move by a few rows a minute. Kept sixty seconds;
+       a filtered list always counts afresh.
+       Past the minute the kept figures are SHOWN and made afresh after the page
+       (stCached's grace), as the makers list is: the sold count and average read
+       every row of the window - 4.7 s on a warm server, and on 29 September the
+       first visit after a quiet spell waited 45 s for them. */
     $plain = ($where_sql === stWindowSql());
     $cachedTotals = $plain ? stCached('totals-w', 60, function () use ($conn) {
         $n = (int) $conn->query("SELECT COUNT(*) FROM car_stats WHERE " . stWindowSql())->fetch_row()[0];
         $g = $conn->query("SELECT COUNT(*) n, AVG(final_price) a FROM car_stats
                             WHERE final_price > 0 AND " . STAT_SOLD_SQL . " AND " . stWindowSql())->fetch_assoc();
         return array('total' => $n, 'sold' => (int) $g['n'], 'avg' => $g['a'] !== null ? (float) $g['a'] : null);
-    }) : null;
+    }, 7 * 86400) : null;
     /* Filtered: the count, how many of them sold, and their average - ONE pass
        over the matching rows rather than two. */
     $st = $cachedTotals ? null : $conn->prepare(

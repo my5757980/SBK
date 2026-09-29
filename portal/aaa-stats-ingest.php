@@ -70,6 +70,22 @@ if (isset($_GET['health'])) {
         'new'       => (int) ($in['new'] ?? 0),
         'run'       => substr((string) ($in['run'] ?? ''), 0, 40),
     );
+    /* The same job reads aaajapan's live auction too (spec 009); its pass reports when
+       it last ended clean, so the auction's signal can name this feed when it stops. */
+    if (isset($in['auction']) && is_array($in['auction'])) {
+        $au = $in['auction'];
+        $keep['auction'] = array(
+            'mode'   => substr((string) ($au['mode'] ?? ''), 0, 10),
+            'at'     => (int) ($au['at'] ?? 0),
+            'ok_at'  => (int) ($au['ok_at'] ?? 0),
+            'err'    => substr((string) ($au['err'] ?? ''), 0, 200),
+            'halls'  => (int) ($au['halls'] ?? 0),
+            'pages'  => (int) ($au['pages'] ?? 0),
+            'new'    => (int) ($au['new'] ?? 0),
+            'used'   => (int) ($au['used'] ?? 0),
+            'budget' => (int) ($au['budget'] ?? 0),
+        );
+    }
     $dir = dirname(__DIR__) . '/aaa-fetch';
     if (!is_dir($dir)) {
         @mkdir($dir, 0750, true);
