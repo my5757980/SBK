@@ -24,11 +24,6 @@ node_modules/
 application/android/
 application/ios/
 application/.expo/
-website-app/android/
-website-app/ios/
-website-app/.expo/
-website-app/release/
-website-app/*.log
 dist/
 build/
 *.apk
