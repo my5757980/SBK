@@ -1712,17 +1712,20 @@ function auctionSplit($total = null) {
 }
 
 /**
- * "A 124,500 · B 1,893" - the split beside a count. With live keys the two figures are kept
- * current by livecount.js (api/counts.php answers auction_a / auction_b).
+ * The auction's count as the owner wants it (29 September 2026): "A 128,018  B 1,232" - A the
+ * first feed's lots, B the second's. The main number IS A: no total beside it and no small
+ * second line repeating A (that was the first version, and it confused). Call it INSIDE the
+ * element that holds the page's number, so both figures take its size and colour. With $live
+ * livecount.js keeps them current (api/counts.php answers auction_a / auction_b); $idA / $idB
+ * name them for a page's own script (the list's lots.js).
  */
-function feedSplitHtml($a, $b, $live = false, $id = '') {
-    $la = $live ? ' data-live="auction_a"' : '';
-    $lb = $live ? ' data-live="auction_b"' : '';
-    // styled inline so no shared stylesheet changes: small, the page's own colour, one line
-    return '<span class="feed-split"' . ($id !== '' ? ' id="' . sanitize($id) . '"' : '')
-         . ' style="font-size:.85em;opacity:.85;white-space:nowrap"'
-         . ' title="A: first feed · B: second feed">A <b' . $la . '>' . number_format((int) $a) . '</b>'
-         . ' &middot; B <b' . $lb . '>' . number_format((int) $b) . '</b></span>';
+function feedCountHtml($a, $b, $live = false, $idA = '', $idB = '') {
+    $one = function ($letter, $n, $key, $id) use ($live) {
+        return '<span class="feed-count" style="white-space:nowrap">' . $letter . ' <span'
+             . ($id !== '' ? ' id="' . sanitize($id) . '"' : '') . ($live ? ' data-live="' . $key . '"' : '') . '>'
+             . number_format((int) $n) . '</span></span>';
+    };
+    return $one('A', $a, 'auction_a', $idA) . ' &nbsp; ' . $one('B', $b, 'auction_b', $idB);
 }
 
 /**
