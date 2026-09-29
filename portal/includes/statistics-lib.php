@@ -197,23 +197,106 @@ function stList($v, $max = 80) {
 
 /**
  * A slow answer kept for a while in the server's temp folder. The lists below are
- * GROUP BYs over a million rows (about a second each) and change slowly, so a page
- * view must not pay for them every time.
+ * GROUP BYs over a million rows and change slowly, so a page view must not pay for
+ * them every time.
+ *
+ * $grace - for how long past $ttl the kept answer may still be SHOWN while a fresh
+ * one is made after the page has gone out (stRemakeLater). 0 = make it now, as
+ * always. Why (29 September 2026): since the lists count only the source's window,
+ * each is a scan of the whole table - makers and the three filter lists about six
+ * seconds apiece on the shared server - and when they fell due together the one
+ * visitor who happened by waited 25-30 seconds for the page.
  */
-function stCached($key, $ttl, $make) {
+function stCached($key, $ttl, $make, $grace = 0) {
     $f = sys_get_temp_dir() . '/sbk-stats-' . preg_replace('/[^a-z0-9_-]/i', '', $key) . '.json';
-    if (is_file($f) && (time() - filemtime($f)) < $ttl) {
+    $age = is_file($f) ? time() - filemtime($f) : -1;
+    if ($age >= 0 && $age < $ttl + $grace) {
         $v = json_decode((string) @file_get_contents($f), true);
         if (is_array($v)) {
+            if ($age >= $ttl) {
+                stRemakeLater($f, $ttl, $make);
+            }
             return $v;
         }
     }
     $v = $make();
-    if (is_array($v) && $v) {
-        @file_put_contents($f . '.tmp', json_encode($v));
-        @rename($f . '.tmp', $f);
-    }
+    stKeep($f, $v);
     return is_array($v) ? $v : array();
+}
+
+/** Keep an answer: written aside, then moved into place, so a reader never sees half. */
+function stKeep($f, $v) {
+    if (is_array($v) && $v) {
+        $tmp = $f . '.' . getmypid() . '.tmp';
+        if (@file_put_contents($tmp, json_encode($v)) !== false) {
+            @rename($tmp, $f);
+        } else {
+            @unlink($tmp);
+        }
+    }
+}
+
+/**
+ * Note a kept answer to be made afresh once THIS page has been sent: the visitor
+ * gets the page with the kept answer, the next one finds the fresh answer.
+ *
+ * The page calls stRemakeQueued() as its last line - NOT a shutdown function:
+ * config.php's shutdown function closes the database connection, and it was
+ * registered first, so it runs first.
+ */
+function stRemakeLater($f, $ttl, $make) {
+    $GLOBALS['stRemakes'][$f] = array($ttl, $make);
+}
+
+/** Make afresh what stRemakeLater() noted - after the page is out; one process at a
+    time per list (a lock beside the file), everyone else showing the kept one. */
+function stRemakeQueued() {
+    $jobs = $GLOBALS['stRemakes'] ?? array();
+    $GLOBALS['stRemakes'] = array();
+    foreach ($jobs as $f => $job) {
+        list($ttl, $make) = $job;
+        $lock = @fopen($f . '.lock', 'c');
+        if (!$lock) {
+            continue;
+        }
+        if (!flock($lock, LOCK_EX | LOCK_NB)) {
+            fclose($lock);                          // another visit is making it already
+            continue;
+        }
+        clearstatcache(true, $f);
+        if (!is_file($f) || time() - filemtime($f) >= $ttl) {
+            stLetGo();
+            @set_time_limit(120);
+            try {
+                stKeep($f, $make());
+            } catch (Throwable $e) {
+                error_log('statistics: remaking ' . basename($f) . ' failed: ' . $e->getMessage());
+            }
+        }
+        flock($lock, LOCK_UN);
+        fclose($lock);
+    }
+}
+
+/** Hand the finished page to the browser now; the script carries on without it. */
+function stLetGo() {
+    static $gone = false;
+    if ($gone) {
+        return;
+    }
+    $gone = true;
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_write_close();                      // the visitor's next click must not wait on this one
+    }
+    ignore_user_abort(true);
+    while (ob_get_level() > 0 && @ob_end_flush()) {
+    }
+    @flush();
+    if (function_exists('litespeed_finish_request')) {
+        litespeed_finish_request();                 // this server runs LiteSpeed
+    } elseif (function_exists('fastcgi_finish_request')) {
+        fastcgi_finish_request();
+    }
 }
 
 /** Transmission, equipment and colour, most common first, with their counts. */
@@ -231,7 +314,7 @@ function stFacets($conn) {
             }
         }
         return $out;
-    });
+    }, 7 * 86400);
 }
 
 /**

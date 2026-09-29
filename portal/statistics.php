@@ -360,7 +360,7 @@ if ($haveTable) {
             while ($w = $res->fetch_assoc()) { $out[] = $w; }
         }
         return $out;
-    });
+    }, 7 * 86400);                       // shown while it is re-made after the page (stCached)
     $housesByDay = array();              // the halls' boxes are off the page (26 Sep 2026)
     $facets      = stFacets($conn);
 
@@ -867,3 +867,4 @@ document.addEventListener('click', function (ev) {
 </script>
 
 <?php require_once 'includes/footer.php'; ?>
+<?php stRemakeQueued();   // lists past their time, made afresh now the page is out (stCached) ?>
