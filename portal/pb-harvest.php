@@ -571,9 +571,12 @@ function storeLots($conn, array $rows, $dry, array &$st) {
                           grade=COALESCE(NULLIF(?, ''), grade), rating=COALESCE(NULLIF(?, ''), rating),
                           engine_cc=IF(? > 0, ?, engine_cc), color=COALESCE(NULLIF(?, ''), color),
                           equipment=COALESCE(NULLIF(?, ''), equipment), status=?,
-                          images=IF(CHAR_LENGTH(images) > 2, images, ?), source_url=?,
+                          images=IF(CHAR_LENGTH(images) > 2 AND images NOT LIKE '%ajes.com%', images, ?), source_url=?,
                           source_section='japan', last_updated=NOW()
                           WHERE id=?");
+                /* A row from the second feed (aaajapan, spec 009) has that source's three
+                   pictures; when PB lists the same lot, PB's picture replaces them, so the
+                   car gets PB's full set and is PB's from here on (retire, sweep, count). */
                 }
                 $id = (int) $old['id'];
                 $upd->bind_param('sssi' . 'ii' . 'dd' . 'dd' . 'ss' . 's' . 'ssss' . 'ii' . 'ss' . 's' . 'ss' . 'i',
@@ -683,8 +686,11 @@ function touchedRows($conn, array $c) {
     // store that word. Leaving those out made a house look SHORT for ever - it
     // read again every half hour and was read twice for nothing, and it was
     // read as "the source lists lots twice", which it does not.
+    // Only rows PB itself wrote (its link on them): the second feed's rows (aaajapan,
+    // spec 009) can share a hall's name and be written during this read - counting them
+    // would call a short read whole and retire the lots it slid past.
     $q = $conn->prepare("SELECT COUNT(*) FROM cars WHERE auction_on = ? AND auction = ?
-                          AND last_updated >= ?");
+                          AND last_updated >= ? AND source_url LIKE 'https://pacificboeki.jp%'");
     $q->bind_param('sss', $c['d'], $c['h'], $c['since']);
     $q->execute();
     $n = (int) $q->get_result()->fetch_row()[0];
@@ -726,7 +732,9 @@ function sweepDay($conn, array &$s, $d) {
         return 0;
     }
     $sellable = "source_section = 'japan' AND auction_on = ? AND (status IS NULL OR status LIKE 'available%')";
-    $left = "$sellable AND car_id NOT LIKE 'pb-%'
+    // The second feed's rows (aaajapan, `aj-`, spec 009) are not leftovers - that feed
+    // keeps and retires them itself; only what jpauc left is swept here.
+    $left = "$sellable AND car_id NOT LIKE 'pb-%' AND car_id NOT LIKE 'aj-%'
              AND (source_url IS NULL OR source_url NOT LIKE 'https://pacificboeki.jp%')";
     $count = function ($where) use ($conn, $d) {
         $q = $conn->prepare("SELECT COUNT(*) FROM cars WHERE $where");

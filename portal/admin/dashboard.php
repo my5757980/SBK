@@ -276,6 +276,8 @@ require_once '_header.php';
   <div class="kpi accent">
     <div class="k">Auction</div>
     <div class="v" data-live="auction"><?php echo number_format($stats['available_cars']); ?></div>
+    <?php $split = auctionSplit($stats['available_cars']); ?>
+    <div class="s"><?php echo feedSplitHtml($split['a'], $split['b'], true); ?></div>
     <div class="s">still to be auctioned</div>
   </div>
   <?php // Sold and awaiting-result tiles removed: a vehicle no longer offered is

@@ -379,6 +379,7 @@ require_once 'includes/header.php';
   <div class="pb-resultbar">
     <div class="pb-total">
       Total Records : <strong id="resultsCount"><?php echo number_format($total_cars); ?></strong>
+      <?php echo feedSplitHtml($total_cars - (int) ($result['total_b'] ?? 0), (int) ($result['total_b'] ?? 0), false, 'resultsSplit'); ?>
       <span id="liveBadge" class="live-badge" title="Inventory updates automatically">Live</span>
     </div>
     <label class="pb-perpage">

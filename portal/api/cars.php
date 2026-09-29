@@ -120,6 +120,7 @@ foreach ($result['cars'] as $c) {
 echo json_encode(array(
     'version'     => $version,
     'total'       => intval($result['total']),
+    'total_b'     => intval($result['total_b'] ?? 0),       // the second feed's share (spec 009)
     'page'        => $result['page'],
     'total_pages' => intval($result['total_pages']),
     'server_time' => date('c'),

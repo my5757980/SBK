@@ -284,8 +284,18 @@
     document.body.appendChild(pill);
   }
 
+  var splitEl = document.getElementById('resultsSplit');
+
   function apply(data) {
     if (countEl) countEl.textContent = fmtInt(data.total);
+    // the count split by feed, A and B (spec 009)
+    if (splitEl && typeof data.total_b === 'number') {
+      var bs = splitEl.querySelectorAll('b');
+      if (bs.length === 2) {
+        bs[0].textContent = fmtInt(Math.max(0, data.total - data.total_b));
+        bs[1].textContent = fmtInt(data.total_b);
+      }
+    }
 
     var byId = {};
     (data.cars || []).forEach(function (c) { byId[c.id] = c; });
