@@ -102,6 +102,51 @@ $blank = array('km' => "(mileage IS NULL OR mileage = 0)", 'cc' => "(engine_cc I
 if (isset($blank[$sort])) {
     $orderBy = $blank[$sort] . ' ASC, ' . $orderBy;
 }
+/* A FIRST CLICK IS READ STRAIGHT FROM AN INDEX (29 September 2026). Descending - the
+   rule for a first click - follows the column's own index on car_stats (the column
+   and the sale day: k_final_day, k_start_day, k_km_day, k_cc_day, k_year_day,
+   k_chassis_day, k_maker_model_day) and stops after the rows the page shows. Until
+   then every column but the date made the server sort the whole three-month window,
+   1.2 million rows, for each page: 5-17 s (Model 16.7 s, Final 5.9 s); now a few
+   milliseconds. Ties go to the newest sale, then the row's key. No "blanks last" rule
+   is needed going down - an empty or zero value is already the lowest. */
+$FAST_DESC = array(
+    'final'   => 'final_price DESC, sold_on DESC, stat_id DESC',
+    'start'   => 'start_price DESC, sold_on DESC, stat_id DESC',
+    'km'      => 'mileage DESC, sold_on DESC, stat_id DESC',
+    'cc'      => 'engine_cc DESC, sold_on DESC, stat_id DESC',
+    'year'    => 'year DESC, sold_on DESC, stat_id DESC',
+    'chassis' => 'chassis DESC, sold_on DESC, stat_id DESC',
+    'model'   => 'maker DESC, model DESC, sold_on DESC, stat_id DESC',
+    // rating_key: the grade's number, -1 for a letter grade, -2 for none (a VIRTUAL
+    // column of car_stats, indexed with the grade and the day as k_grade_day)
+    'grade'   => 'rating_key DESC, rating DESC, sold_on DESC, stat_id DESC',
+);
+if ($dir === 'DESC' && isset($FAST_DESC[$sort])) {
+    $orderBy = $FAST_DESC[$sort];
+}
+/* ASCENDING - THE SECOND CLICK - FROM THE SAME INDEXES. Going up, the blanks (no
+   price, no mileage, no grade...) must still come last, and "blanks last" cannot be
+   read from an index. So an ascending list is read in two parts: the rows that HAVE
+   the value, lowest first, straight from the column's index; then, after the last of
+   them, the rest, as before (none-at-all first, then zero or empty, newest first; for
+   the grade, the letter grades and then none). Which part a page falls in comes from
+   how many rows have the value - stHasCount(). This was the old full sort, 9-19 s a
+   page. Per column: what "has the value" is, the order of those rows, of the rest. */
+$FAST_ASC = array(
+    'final'   => array('final_price > 0', 'final_price ASC, sold_on ASC, stat_id ASC', 'final_price ASC, sold_on DESC, stat_id DESC'),
+    'start'   => array('start_price > 0', 'start_price ASC, sold_on ASC, stat_id ASC', 'start_price ASC, sold_on DESC, stat_id DESC'),
+    'km'      => array('mileage > 0',     'mileage ASC, sold_on ASC, stat_id ASC',     'mileage ASC, sold_on DESC, stat_id DESC'),
+    'cc'      => array('engine_cc > 0',   'engine_cc ASC, sold_on ASC, stat_id ASC',   'engine_cc ASC, sold_on DESC, stat_id DESC'),
+    'year'    => array('year > 0',        'year ASC, sold_on ASC, stat_id ASC',        'year ASC, sold_on DESC, stat_id DESC'),
+    'chassis' => array("chassis > ''",    'chassis ASC, sold_on ASC, stat_id ASC',     'chassis ASC, sold_on DESC, stat_id DESC'),
+    'grade'   => array('rating_key >= 0', 'rating_key ASC, rating ASC, sold_on ASC, stat_id ASC',
+                       'rating_key DESC, rating ASC, sold_on DESC, stat_id DESC'),
+);
+$split = ($dir === 'ASC' && isset($FAST_ASC[$sort])) ? $FAST_ASC[$sort] : null;
+if ($dir === 'ASC' && $sort === 'model') {
+    $orderBy = 'maker ASC, model ASC, sold_on ASC, stat_id ASC';   // nothing blank to put last: one index read
+}
 
 $where  = array(stWindowSql());      // only what the source shows - see STAT_WINDOW_DAYS
 $params = array();
@@ -202,28 +247,91 @@ $where_sql = implode(' AND ', $where);
 /* The list as a spreadsheet - the source's download button. For the desk only:
    the statistics are the business's paid data, and a customer copying ten
    thousand rows at a click is not something to hand out by default. */
+/** How many rows under the current filters HAVE the value an ascending list is
+    sorted by ($split) - where its two parts meet. Unfiltered, kept a minute. */
+function stHasCount($conn) {
+    global $where_sql, $types, $params, $split, $sort;
+    $count = function () use ($conn, $where_sql, $types, $params, $split) {
+        $st = $conn->prepare("SELECT COUNT(*) FROM car_stats WHERE $where_sql AND {$split[0]}");
+        if (!$st) { return 0; }
+        if ($params) { $st->bind_param($types, ...$params); }
+        $st->execute();
+        $n = (int) $st->get_result()->fetch_row()[0];
+        $st->close();
+        return $n;
+    };
+    if ($where_sql === stWindowSql()) {
+        $c = stCached('has-' . $sort . '-w', 60, function () use ($count) { return array('n' => $count()); });
+        return (int) ($c['n'] ?? 0);
+    }
+    return $count();
+}
+
+/** Rows of the list in its order: $limit of them from $offset. An ascending sort by an
+    indexed column comes in its two parts ($FAST_ASC); $has = stHasCount(), if known.
+
+    The order is worked out on the rows' keys alone, then just the rows it picked are
+    read by key. A sort no index serves (hall, lot, the date going up) used to drag every
+    whole row - photo lists and all - through the sort: 8-10 s; the keys alone take ~2 s.
+    And a deep page of an indexed sort now skips its offset inside the index. */
+function stListRows($conn, $cols, $limit, $offset, $has = null) {
+    global $where_sql, $types, $params, $orderBy, $split;
+    $run = function ($extra, $order, $lim, $off) use ($conn, $cols, $where_sql, $types, $params) {
+        $st = $conn->prepare("SELECT stat_id FROM car_stats WHERE $where_sql$extra ORDER BY $order LIMIT ? OFFSET ?");
+        if (!$st) { return array(); }
+        $p2 = $params; $p2[] = (int) $lim; $p2[] = (int) $off;
+        $st->bind_param($types . 'ii', ...$p2);
+        $st->execute();
+        $ids = array();
+        foreach ($st->get_result()->fetch_all() as $x) { $ids[] = $x[0]; }
+        $st->close();
+        if (!$ids || $cols === 'stat_id') {
+            return array_map(function ($id) { return array('stat_id' => $id); }, $ids);
+        }
+        $st = $conn->prepare("SELECT $cols FROM car_stats WHERE stat_id IN ("
+                             . implode(',', array_fill(0, count($ids), '?')) . ")");
+        if (!$st) { return array(); }
+        $st->bind_param(str_repeat('s', count($ids)), ...$ids);
+        $st->execute();
+        $by = array();
+        foreach ($st->get_result()->fetch_all(MYSQLI_ASSOC) as $x) { $by[$x['stat_id']] = $x; }
+        $st->close();
+        $r = array();
+        foreach ($ids as $id) {
+            if (isset($by[$id])) { $r[] = $by[$id]; }      // in the order the keys came
+        }
+        return $r;
+    };
+    if (!$split) {
+        return $run('', $orderBy, $limit, $offset);
+    }
+    if ($has === null) {
+        $has = stHasCount($conn);
+    }
+    $rows = $offset < $has ? $run(" AND {$split[0]}", $split[1], $limit, $offset) : array();
+    $need = $limit - count($rows);
+    if ($need > 0) {
+        $rows = array_merge($rows, $run(" AND COALESCE({$split[0]}, 0) = 0", $split[2], $need, max(0, $offset - $has)));
+    }
+    return $rows;
+}
+
 if (isset($_GET['csv']) && isAdmin() && $haveTable) {
     if (function_exists('session_write_close')) { session_write_close(); }
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="sbk-statistics-' . date('Y-m-d') . '.csv"');
     $out = fopen('php://output', 'w');
     fwrite($out, "\xEF\xBB\xBF");                         // so Excel reads the yen sign and the dashes
+    // $escape given out loud (the old default): PHP 8.4 logged a deprecation per row without it
     fputcsv($out, array('Sold on', 'Time', 'Auction', 'Lot', 'Maker', 'Model', 'Year', 'Chassis', 'Model grade',
                         'Engine cc', 'HP', 'Transmission', 'Equipment', 'Drive', 'Mileage km', 'Colour',
-                        'Condition', 'Start JPY', 'Final JPY', 'Result'));
-    $st = $conn->prepare("SELECT * FROM car_stats WHERE $where_sql ORDER BY $orderBy LIMIT 10000");
-    if ($st) {
-        if ($params) { $st->bind_param($types, ...$params); }
-        $st->execute();
-        $res = $st->get_result();
-        while ($c = $res->fetch_assoc()) {
-            $o = stOutcome($c);
-            fputcsv($out, array($c['sold_on'], $c['sold_time'], $c['auction'], $c['lot_no'], $c['maker'], $c['model'],
-                $c['year'], $c['chassis'], stText($c['model_grade']), $c['engine_cc'], stHp($c) ?: '',
-                $c[STAT_COL_TRANS], $c[STAT_COL_EQUIP], $c['drive'], $c['mileage'], $c['colour'], $c['rating'],
-                $c['start_price'], $c['final_price'], $o['label']));
-        }
-        $st->close();
+                        'Condition', 'Start JPY', 'Final JPY', 'Result'), ',', '"', '\\');
+    foreach (stListRows($conn, '*', 10000, 0) as $c) {
+        $o = stOutcome($c);
+        fputcsv($out, array($c['sold_on'], $c['sold_time'], $c['auction'], $c['lot_no'], $c['maker'], $c['model'],
+            $c['year'], $c['chassis'], stText($c['model_grade']), $c['engine_cc'], stHp($c) ?: '',
+            $c[STAT_COL_TRANS], $c[STAT_COL_EQUIP], $c['drive'], $c['mileage'], $c['colour'], $c['rating'],
+            $c['start_price'], $c['final_price'], $o['label']), ',', '"', '\\');
     }
     fclose($out);
     exit;
@@ -250,14 +358,7 @@ if (isset($_GET['ids'])) {
     $ids = array();
     $pg  = max(1, (int) ($_GET['page'] ?? 1));
     if ($haveTable) {
-        $st = $conn->prepare("SELECT stat_id FROM car_stats WHERE $where_sql ORDER BY $orderBy LIMIT ? OFFSET ?");
-        if ($st) {
-            $p2 = $params; $p2[] = $per_page; $p2[] = ($pg - 1) * $per_page;
-            $st->bind_param($types . 'ii', ...$p2);
-            $st->execute();
-            foreach ($st->get_result()->fetch_all() as $r) { $ids[] = $r[0]; }
-            $st->close();
-        }
+        foreach (stListRows($conn, 'stat_id', $per_page, ($pg - 1) * $per_page) as $r) { $ids[] = $r['stat_id']; }
     }
     echo json_encode(array('ids' => $ids, 'page' => $pg));
     exit;
@@ -310,8 +411,10 @@ if ($haveTable) {
     $st = $cachedTotals ? null : $conn->prepare(
         "SELECT COUNT(*) n,
                 SUM(final_price > 0 AND " . STAT_SOLD_SQL . ") sn,
-                AVG(CASE WHEN final_price > 0 AND " . STAT_SOLD_SQL . " THEN final_price END) a
+                AVG(CASE WHEN final_price > 0 AND " . STAT_SOLD_SQL . " THEN final_price END) a"
+         . ($split ? ", SUM(COALESCE({$split[0]}, 0)) h" : '') . "
            FROM car_stats WHERE $where_sql");
+    $hasN = null;                        // an ascending split's meeting point, from this same pass
     if ($cachedTotals) {
         $total = (int) $cachedTotals['total'];
         $soldN = (int) $cachedTotals['sold'];
@@ -324,6 +427,7 @@ if ($haveTable) {
         $total = (int) $g['n'];
         $soldN = (int) $g['sn'];
         $avg   = $g['a'] !== null ? (float) $g['a'] : null;
+        if ($split) { $hasN = (int) $g['h']; }
         $st->close();
     }
 
@@ -335,21 +439,11 @@ if ($haveTable) {
     $page   = min($page, $pages);
     $offset = ($page - 1) * $per_page;
 
-    $st = $conn->prepare(
-        "SELECT stat_id, maker, model, lot_no, auction, sold_on, sold_time, year,
-                engine_cc, mileage, chassis, grade, model_grade, transmission,
-                rating, engine_hp, drive, colour, start_price, final_price, result, photos
-           FROM car_stats
-          WHERE $where_sql
-          ORDER BY $orderBy
-          LIMIT ? OFFSET ?");
-    if ($st) {
-        $p2 = $params; $p2[] = $per_page; $p2[] = $offset;
-        $st->bind_param($types . 'ii', ...$p2);
-        $st->execute();
-        $rows = $st->get_result()->fetch_all(MYSQLI_ASSOC);
-        $st->close();
-    }
+    $rows = stListRows($conn,
+        'stat_id, maker, model, lot_no, auction, sold_on, sold_time, year,
+         engine_cc, mileage, chassis, grade, model_grade, transmission,
+         rating, engine_hp, drive, colour, start_price, final_price, result, photos',
+        $per_page, $offset, $hasN);
 
     // A GROUP BY over a million rows for a list that changes slowly: kept ten minutes.
     $makers = stCached('makers-w', 600, function () use ($conn) {
