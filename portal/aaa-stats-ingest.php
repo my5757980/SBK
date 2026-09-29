@@ -172,12 +172,25 @@ $conn->query(
        source       VARCHAR(24)  NOT NULL DEFAULT 'aaajapan',
        last_seen    DATETIME     NOT NULL,
        created_at   DATETIME     NOT NULL,
+       -- the condition grade as one sort key, never stored: its number, -1 a letter grade,
+       -- -2 none (statistics.php sorts by it; added to the live table 29 Sep 2026)
+       rating_key   DECIMAL(5,1) AS (CASE WHEN rating IS NULL OR rating = '' THEN -2
+                      WHEN rating REGEXP '^[0-9]+([.][0-9]*)?\$' THEN CAST(rating AS DECIMAL(5,1)) ELSE -1 END) VIRTUAL,
        PRIMARY KEY (stat_id),
-       KEY k_maker_model (maker, model),
        KEY k_sold_on (sold_on),
        KEY k_chassis (chassis),
        KEY k_lot (lot_no),
-       KEY k_auction (auction)
+       KEY k_auction (auction),
+       -- what the Statistics page reads its orders from (24 and 29 Sep 2026)
+       KEY k_day_hall_lot (sold_on DESC, auction, lot_no),
+       KEY k_chassis_day (chassis, sold_on),
+       KEY k_maker_model_day (maker, model, sold_on),
+       KEY k_final_day (final_price, sold_on),
+       KEY k_start_day (start_price, sold_on),
+       KEY k_km_day (mileage, sold_on),
+       KEY k_cc_day (engine_cc, sold_on),
+       KEY k_year_day (year, sold_on),
+       KEY k_grade_day (rating_key, rating, sold_on)
      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
 /* Added 15 September 2026, after the row map was read out of the source's own
    template instead of guessed. A table made before that date has neither. */
