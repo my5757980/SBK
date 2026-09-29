@@ -133,11 +133,11 @@ require_once '_header.php';
   <?php if ($search !== '' || $status !== '' || $show !== 'live'): ?>
     <a href="cars.php" class="btn btn-ghost">Clear</a>
   <?php endif; ?>
-  <span class="page-info"><strong<?php echo $show === 'live' ? ' data-live="auction"' : ''; ?>><?php
-            echo number_format($total); ?></strong> matching<?php
-            echo $show !== 'live' ? ' - including lots no longer on the portal' : '';
-          ?> <?php echo feedSplitHtml((int) $total - (int) $total_b, $total_b,
-                                     $show === 'live' && $search === '' && $status === ''); ?></span>
+  <span class="page-info"><strong><?php
+            // live only unfiltered: a search's own count must not be overwritten by the whole auction's
+            echo feedCountHtml((int) $total - (int) $total_b, $total_b, $show === 'live' && $search === '' && $status === '');
+          ?></strong> matching<?php
+            echo $show !== 'live' ? ' - including lots no longer on the portal' : ''; ?></span>
 </form>
 
 <div class="admin-card">

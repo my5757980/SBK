@@ -284,18 +284,14 @@
     document.body.appendChild(pill);
   }
 
-  var splitEl = document.getElementById('resultsSplit');
+  var countB = document.getElementById('resultsCountB');
 
   function apply(data) {
-    if (countEl) countEl.textContent = fmtInt(data.total);
-    // the count split by feed, A and B (spec 009)
-    if (splitEl && typeof data.total_b === 'number') {
-      var bs = splitEl.querySelectorAll('b');
-      if (bs.length === 2) {
-        bs[0].textContent = fmtInt(Math.max(0, data.total - data.total_b));
-        bs[1].textContent = fmtInt(data.total_b);
-      }
-    }
+    // the count by feed (the owner, 29 Sep 2026): #resultsCount is A - the first feed's lots -
+    // and #resultsCountB is B, the second feed's, the same size beside it; no total shown
+    var b = typeof data.total_b === 'number' ? data.total_b : 0;
+    if (countEl) countEl.textContent = fmtInt(Math.max(0, data.total - b));
+    if (countB) countB.textContent = fmtInt(b);
 
     var byId = {};
     (data.cars || []).forEach(function (c) { byId[c.id] = c; });

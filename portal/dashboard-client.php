@@ -88,9 +88,8 @@ require_once 'includes/header.php';
           // reader pressed refresh. ?>
     <div class="stat-tile accent">
       <div class="k">Inventory available</div>
-      <div class="v" data-live="auction"><?php $st = getInventoryStats(); echo number_format($st['available']); ?></div>
-      <?php $split = auctionSplit($st['available']); ?>
-      <div class="s"><?php echo feedSplitHtml($split['a'], $split['b'], true); ?></div>
+      <?php $st = getInventoryStats(); $split = auctionSplit($st['available']); ?>
+      <div class="v"><?php echo feedCountHtml($split['a'], $split['b'], true); ?></div>
       <div class="s">Updated live from Japan</div>
     </div>
     <div class="stat-tile">
