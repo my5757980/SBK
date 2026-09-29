@@ -19,8 +19,10 @@ require_once 'includes/header.php';
 <section class="welcome-head">
   <div class="container">
     <h1>Welcome to <em>SBK Auction</em></h1>
+    <?php $split = auctionSplit($stats['available']); ?>
     <p>Choose a manufacturer to begin. <?php echo number_format($stats['available']); ?>
-       vehicles are available across <?php echo number_format($stats['auctions']); ?> Japanese auction houses.</p>
+       vehicles (<?php echo feedSplitHtml($split['a'], $split['b']); ?>) are available across
+       <?php echo number_format($stats['auctions']); ?> Japanese auction houses.</p>
     <?php // Staff only: is the Pacific Boeki ID the auction comes from still working? ?>
     <?php echo sourceSignal('auction', 'src-sig-line'); ?>
   </div>

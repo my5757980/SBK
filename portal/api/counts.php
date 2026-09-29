@@ -50,6 +50,11 @@ $out = array(
     'at'       => date('c'),
 );
 $out['stock'] = $out['auction'];      // one section since fixed price was removed
+// The same count split by feed (spec 009): B the second feed's own rows, A the rest.
+if ($out['auction'] >= 0) {
+    $out['auction_b'] = feedBCount(currentLotsSql('c'));
+    $out['auction_a'] = max(0, $out['auction'] - $out['auction_b']);
+}
 
 // Past sales, for the Statistics tile on both dashboards. Cached a minute -
 // see statsCount(), which the dashboards use to print the first figure.

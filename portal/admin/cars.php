@@ -72,6 +72,8 @@ if ($params) { $stmt->bind_param($types, ...$params); }
 $stmt->execute();
 $total = $stmt->get_result()->fetch_assoc()['c'];
 $stmt->close();
+// the same filter's second-feed rows (spec 009) - the count shown split, A and B
+$total_b = feedBCount($where_sql, $params, $types, 'cars');
 
 $stmt = $conn->prepare("
     SELECT id, car_id, lot_no, make, model, year, mileage, price, currency,
@@ -134,7 +136,8 @@ require_once '_header.php';
   <span class="page-info"><strong<?php echo $show === 'live' ? ' data-live="auction"' : ''; ?>><?php
             echo number_format($total); ?></strong> matching<?php
             echo $show !== 'live' ? ' - including lots no longer on the portal' : '';
-          ?></span>
+          ?> <?php echo feedSplitHtml((int) $total - (int) $total_b, $total_b,
+                                     $show === 'live' && $search === '' && $status === ''); ?></span>
 </form>
 
 <div class="admin-card">

@@ -1468,6 +1468,8 @@ function getActiveCars($page = 1, $per_page = 12, $filters = array()) {
     $stmt->execute();
     $total = $stmt->get_result()->fetch_assoc()['total'];
     $stmt->close();
+    // how many of them are the second feed's (spec 009) - before LIMIT/OFFSET join the params
+    $total_b = feedBCount($where_clause, $params, $types);
 
     // Get cars
     $query = "
@@ -1503,6 +1505,7 @@ function getActiveCars($page = 1, $per_page = 12, $filters = array()) {
     return array(
         'cars' => $cars,
         'total' => $total,
+        'total_b' => $total_b,
         'page' => $page,
         'per_page' => $per_page,
         'total_pages' => ceil($total / $per_page)
@@ -1655,6 +1658,71 @@ function getInventoryStats() {
         $out['auctions']  = intval($row['auctions']);
     }
     return $out;
+}
+
+/* ------------------------------------------------ THE COUNT, SPLIT BY FEED (spec 009)
+
+   Since 29 September 2026 the auction has two feeds in one list: A, the first (every row
+   that is not the second's - PB's, and anything PB took over) and B, the second (the rows
+   it holds itself, `aj-`, until PB lists the same lot and adopts them). The client wants
+   the count split wherever it is shown, and no source named on any page - so A and B.
+
+   B is read through the car_id index (`aj-` prefix) and then checked for its own link, so
+   the split costs a few thousand rows, not the whole table. */
+
+/** SQL: this row is the second feed's (B). */
+function feedBSql($alias = 'c') {
+    return "($alias.car_id LIKE 'aj-%' AND $alias.source_url LIKE 'https://bid.aaajapan.com%')";
+}
+
+/**
+ * How many rows a WHERE matches that are the second feed's.
+ * @param string $where  the same clause the total was counted with
+ * @param string $alias  the table's alias in that clause (`c`, or `cars` where it names the table)
+ */
+function feedBCount($where, $params = array(), $types = '', $alias = 'c') {
+    global $conn;
+    $st = $conn->prepare("SELECT COUNT(*) FROM cars $alias WHERE ($where) AND " . feedBSql($alias));
+    if (!$st) {
+        return 0;
+    }
+    if ($params) {
+        $st->bind_param($types, ...$params);
+    }
+    $st->execute();
+    $n = (int) $st->get_result()->fetch_row()[0];
+    $st->close();
+    return $n;
+}
+
+/**
+ * The lots on offer, split: array('total', 'a', 'b') - counted fresh, like every auction
+ * count the pages already print (B is the cheap half: a range of the car_id index).
+ * @param int|null $total the total the caller already counted, to count it once
+ */
+function auctionSplit($total = null) {
+    global $conn;
+    $cur = currentLotsSql('c');
+    if ($total === null) {
+        $r = $conn->query("SELECT COUNT(*) FROM cars c WHERE $cur");
+        $total = $r ? (int) $r->fetch_row()[0] : 0;
+    }
+    $b = feedBCount($cur);
+    return array('total' => (int) $total, 'a' => max(0, (int) $total - $b), 'b' => $b);
+}
+
+/**
+ * "A 124,500 · B 1,893" - the split beside a count. With live keys the two figures are kept
+ * current by livecount.js (api/counts.php answers auction_a / auction_b).
+ */
+function feedSplitHtml($a, $b, $live = false, $id = '') {
+    $la = $live ? ' data-live="auction_a"' : '';
+    $lb = $live ? ' data-live="auction_b"' : '';
+    // styled inline so no shared stylesheet changes: small, the page's own colour, one line
+    return '<span class="feed-split"' . ($id !== '' ? ' id="' . sanitize($id) . '"' : '')
+         . ' style="font-size:.85em;opacity:.85;white-space:nowrap"'
+         . ' title="A: first feed · B: second feed">A <b' . $la . '>' . number_format((int) $a) . '</b>'
+         . ' &middot; B <b' . $lb . '>' . number_format((int) $b) . '</b></span>';
 }
 
 /**
