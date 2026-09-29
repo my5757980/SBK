@@ -1,0 +1,53 @@
+{
+  "expo": {
+    "name": "SBK Global Auto Trading",
+    "slug": "sbk-website",
+    "version": "1.0.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#FFFFFF",
+    "primaryColor": "#18335E",
+    "splash": {
+      "backgroundColor": "#18335E",
+      "resizeMode": "contain",
+      "image": "./assets/splash-icon.png"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sbkautotrading.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Used for voice notes and calls in the website's live chat.",
+        "NSCameraUsageDescription": "Used for video calls in the website's live chat.",
+        "NSPhotoLibraryUsageDescription": "Used to pick a picture you choose to send or upload on the website."
+      }
+    },
+    "android": {
+      "package": "com.sbkautotrading.app",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "backgroundColor": "#FFFFFF",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "RECORD_AUDIO",
+        "CAMERA",
+        "MODIFY_AUDIO_SETTINGS"
+      ],
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.VIBRATE"
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "./plugins/withLowMemoryBuild"
+    ]
+  }
+}
