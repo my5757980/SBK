@@ -20,7 +20,8 @@ require_once 'includes/header.php';
   <div class="container">
     <h1>Welcome to <em>SBK Auction</em></h1>
     <?php $split = auctionSplit($stats['available']); ?>
-    <p>Choose a manufacturer to begin. <?php echo feedCountHtml($split['a'], $split['b']); ?>
+    <?php // live, as everywhere else A and B show (livecount.js, api/counts.php) ?>
+    <p>Choose a manufacturer to begin. <?php echo feedCountHtml($split['a'], $split['b'], true); ?>
        vehicles are available across
        <?php echo number_format($stats['auctions']); ?> Japanese auction houses.</p>
     <?php // Staff only: is the Pacific Boeki ID the auction comes from still working? ?>
