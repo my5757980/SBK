@@ -40,11 +40,36 @@ const AUC_SRC  = 'https://bid.aaajapan.com/aj_neo?h=';      // + rawurlencode(ha
 const AUC_IMG  = 'https://8.ajes.com/imgs/';
 const AUC_CAP  = 30;                                        // retire at most this + a tenth of the hall per read
 
+/**
+ * One request at a time over the hall state, from its read to its save. On 30 Sep a test's clean-up
+ * rewrote the file in place while a pass was reading it: the pass read nothing, started from an empty
+ * state and saved that - 39 halls read and 23 learnt hall names gone. Every request takes the lock
+ * (released when the script ends); the fetcher asks one thing at a time, so nobody waits long.
+ */
+function aucLock() {
+    static $h = null;
+    if ($h === null) {
+        $d = dirname(__DIR__) . '/aaa-fetch';
+        if (!is_dir($d)) { @mkdir($d, 0750, true); }
+        $h = @fopen($d . '/auction-halls.lock', 'c');
+        if ($h) { flock($h, LOCK_EX); }
+    }
+}
+/** The hall state. A file that is there but unreadable is NEVER taken for an empty state - that is
+    how it was wiped; the request is refused instead (the pass notes a fault and tries next time). */
 function aucState() {
     $f = dirname(__DIR__) . '/aaa-fetch/auction-halls.json';
-    $s = is_file($f) ? json_decode((string) @file_get_contents($f), true) : null;
-    return is_array($s) ? $s + array('halls' => array(), 'votes' => array(), 'survey' => array())
-                        : array('halls' => array(), 'votes' => array(), 'survey' => array());
+    $empty = array('halls' => array(), 'votes' => array(), 'survey' => array());
+    for ($i = 0; $i < 3; $i++) {
+        clearstatcache(true, $f);
+        if (!is_file($f)) { return $empty; }
+        $s = json_decode((string) @file_get_contents($f), true);
+        if (is_array($s)) { return $s + $empty; }
+        usleep(200000);
+    }
+    http_response_code(503);
+    echo json_encode(array('ok' => false, 'error' => 'the hall state could not be read - try again'));
+    exit;
 }
 function aucSave(array $s) {
     $d = dirname(__DIR__) . '/aaa-fetch';
@@ -189,6 +214,22 @@ function aucSameCar(array $o, $year, $km) {
     if ($hasK && !aucSameKm($k1, $k2)) { return false; }
     return true;
 }
+/**
+ * PB's model_year_en gives some Reiwa cars a Heisei year - a 2020 car as 1990, exactly 30 out (seen
+ * 30 Sep; the owner: correct it). When the source holds the same lot with the right year (2019 on,
+ * the Reiwa era), PB's row takes it; pb-harvest.php keeps a year so corrected. Returns rows changed.
+ */
+function aucFixYear($conn, array $pb, $year) {
+    $y = (int) ($pb['year'] ?? 0);
+    $year = (int) $year;
+    if ($year < 2019 || $y <= 0 || $year - $y !== 30) { return 0; }
+    $q = $conn->prepare("UPDATE cars SET year = ? WHERE car_id = ? AND year = ? AND source_url LIKE 'https://pacificboeki.jp%'");
+    $q->bind_param('isi', $year, $pb['car_id'], $y);
+    $q->execute();
+    $n = max(0, $q->affected_rows);
+    $q->close();
+    return $n;
+}
 /** A make that names nothing: PB files machinery, boats and the like under OTHER, the source OTHERS. */
 function aucGenericMake($m) {
     $k = aucKey($m);
@@ -231,6 +272,7 @@ function aucSame(array $others, $pbHall, $make, $model, $year = 0, $km = 0, $cha
     return count($fit) === 1 ? $fit[0] : null;
 }
 
+aucLock();
 $st = aucState();
 
 /* ---------------------------------------------------------------- what do you have? */
@@ -384,6 +426,7 @@ if (isset($_GET['dedupe'])) {
                                          $a['chassis'] . ' / ' . $same['chassis'], $a['mileage'] . ' / ' . $same['mileage']);
                     }
                 } elseif ($same) {
+                    aucFixYear($conn, $same, (int) $a['year']);           // ours knew the right year
                     $merged += aucMerge($conn, $a['car_id'], $same['car_id']);
                 }
             }
@@ -485,6 +528,7 @@ if (isset($_GET['rows'])) {
         $same = aucSame(aucOthers($conn, $day, $lot), $pbHall, $make, $model, (int) $year, (int) $km, aucText($r['j'] ?? ''));
         if ($same) {
             $out['pb']++;
+            $out['year_fixed'] = ($out['year_fixed'] ?? 0) + aucFixYear($conn, $same, (int) $year);
             // A vote: the source's `$hall` is PB's `$v` - how the hall filter keeps one name.
             $v = trim((string) $same['auction']);
             if ($v !== '' && (strcasecmp($v, $pbHall) === 0 || aucKey($same['make']) === aucKey($make))) {

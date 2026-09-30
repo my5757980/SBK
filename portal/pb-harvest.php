@@ -581,7 +581,11 @@ function storeLots($conn, array $rows, $dry, array &$st) {
                     continue;
                 }
                 if ($upd === null) {
-                    $upd = $conn->prepare("UPDATE cars SET lot_no=?, make=?, model=?, year=?,
+                    /* year: PB's model_year_en gives some Reiwa cars a Heisei year (2020 read as
+                       1990 - exactly 30 out). A year the second feed corrected (aaa-auction-ingest
+                       aucFixYear) is kept: stored >= 2019 and PB's + 30. */
+                    $upd = $conn->prepare("UPDATE cars SET lot_no=?, make=?, model=?,
+                          year=IF(year >= 2019 AND year = ? + 30, year, ?),
                           mileage=IF(? > 0, ?, mileage), price=IF(? > 0, ?, price),
                           sold_price=IF(? > 0, ?, sold_price), auction=?, auction_date=?,
                           auction_time=COALESCE(?, auction_time),
@@ -597,8 +601,8 @@ function storeLots($conn, array $rows, $dry, array &$st) {
                    car gets PB's full set and is PB's from here on (retire, sweep, count). */
                 }
                 $id = (int) $old['id'];
-                $upd->bind_param('sssi' . 'ii' . 'dd' . 'dd' . 'ss' . 's' . 'ssss' . 'ii' . 'ss' . 's' . 'ss' . 'i',
-                    $c['lot'], $c['make'], $c['model'], $c['year'],
+                $upd->bind_param('sss' . 'ii' . 'ii' . 'dd' . 'dd' . 'ss' . 's' . 'ssss' . 'ii' . 'ss' . 's' . 'ss' . 'i',
+                    $c['lot'], $c['make'], $c['model'], $c['year'], $c['year'],
                     $c['km'], $c['km'], $c['price'], $c['price'],
                     $c['sold'], $c['sold'], $c['hall'], $c['date'],
                     $c['time'],
@@ -621,7 +625,8 @@ function storeLots($conn, array $rows, $dry, array &$st) {
                        last_updated, created_at)
                      VALUES (?,?,?,?,?,?,?,'yen',?,?,?,?,?,?,?,?,?,?,?,?,?,?,'japan',NOW(),NOW())
                      ON DUPLICATE KEY UPDATE lot_no=VALUES(lot_no), make=VALUES(make), model=VALUES(model),
-                       year=VALUES(year), mileage=VALUES(mileage), price=VALUES(price),
+                       year=IF(year >= 2019 AND year = VALUES(year) + 30, year, VALUES(year)),
+                       mileage=VALUES(mileage), price=VALUES(price),
                        sold_price=VALUES(sold_price), auction=VALUES(auction), auction_date=VALUES(auction_date),
                        auction_time=COALESCE(VALUES(auction_time), auction_time), chassis=VALUES(chassis),
                        transmission=VALUES(transmission), grade=VALUES(grade), rating=VALUES(rating),
