@@ -329,6 +329,25 @@ function aucDateOf($dom, $today) {
     }
     return $today;
 }
+/** Per hall, the last page whose lots were passed over and why, with samples - never silent again.
+    Written under the request's lock, a whole copy only; the 80 most recent halls. */
+function aucKeepSkips($hall, array $out, array $skip) {
+    $f = dirname(__DIR__) . '/aaa-fetch/auction-skips.json';
+    $all = json_decode((string) @file_get_contents($f), true);
+    if (!is_array($all)) { $all = array(); }
+    $all[$hall] = array('at' => time(), 'counts' => array_intersect_key($out, array_flip(array('new', 'pb', 'past', 'result_skip', 'bad'))),
+                        'samples' => $skip);
+    if (count($all) > 80) {
+        uasort($all, function ($a, $b) { return $b['at'] - $a['at']; });
+        $all = array_slice($all, 0, 80, true);
+    }
+    $json = json_encode($all, JSON_INVALID_UTF8_SUBSTITUTE | JSON_UNESCAPED_UNICODE);
+    if ($json === false) { return; }
+    $tmp = $f . '.' . getmypid() . '.tmp';
+    $w = @file_put_contents($tmp, $json);
+    clearstatcache(true, $tmp);
+    if ($w === strlen($json) && is_file($tmp) && filesize($tmp) === strlen($json)) { @rename($tmp, $f); } else { @unlink($tmp); }
+}
 /** The last survey as the source gave it - every hall's count under each weekday - kept for the
     owner's questions ("of aaajapan's lots on sale, how many are not on PB?"). A whole copy only. */
 function aucKeepSurvey(array $in) {
@@ -558,12 +577,21 @@ if (isset($_GET['rows'])) {
            images=IF(CHAR_LENGTH(VALUES(images)) > 2, VALUES(images), images),
            source_url=VALUES(source_url), last_updated=NOW()");
     $mine = $conn->prepare("SELECT car_id, source_url FROM cars WHERE car_id = ?");
+    /* Why lots of this page were NOT taken, with a sample each (aaa-fetch/auction-skips.json). 30 Sep:
+       MOTA (142) and LUM Tokyo Nyusatsu (278), halls PB lacks entirely, were read whole and not one
+       lot was taken - and nothing said why. */
+    $skip = array();
+    $note = function ($why, $r) use (&$skip) {
+        if (count($skip[$why] ?? array()) < 3) {
+            $skip[$why][] = array_intersect_key((array) $r, array_flip(array('b', 'c', 'd', 'e', 'f', 'v')));
+        }
+    };
     foreach ($rows as $r) {
         if (!is_array($r)) { $out['bad']++; continue; }
         $day = aucDay($r['e'] ?? '');
         $lot = aucLot(aucText($r['c'] ?? ''));
-        if ($day === null || $lot === '') { $out['bad']++; continue; }
-        if ($day < $today) { $out['past']++; continue; }                 // a result of a past day: Statistics' job
+        if ($day === null || $lot === '') { $out['bad']++; $note('bad', $r); continue; }
+        if ($day < $today) { $out['past']++; $note('past', $r); continue; }   // a result of a past day: Statistics' job
         list($make, $model) = aucSplit($r['b'] ?? '', $makers);
         $status = aucStatus($r['v'] ?? '');
         $carId  = substr('aj-' . $day . '-' . substr(preg_replace('/[^A-Za-z0-9]/', '', $hall), 0, 16) . '-'
@@ -593,7 +621,7 @@ if (isset($_GET['rows'])) {
             if ($own) { $out['merged'] += aucMerge($conn, $carId, $same['car_id']); }
             continue;
         }
-        if (!$own && $status !== 'available') { $out['result_skip']++; continue; }   // never offered, already over
+        if (!$own && $status !== 'available') { $out['result_skip']++; $note('result', $r); continue; }   // never offered, already over
 
         $time  = trim(aucText($r['f'] ?? ''), "[] \t");
         $time  = preg_match('/^\d{1,2}:\d{2}$/', $time) ? sprintf('%05s', $time) . ':00' : null;
@@ -632,6 +660,7 @@ if (isset($_GET['rows'])) {
     $mine->close();
     $ins->close();
     aucSave($st);
+    if ($skip) { aucKeepSkips($hall, $out, $skip); }
     aucOut($out + array('now' => time(), 'pb_hall' => $pbHall));
 }
 
