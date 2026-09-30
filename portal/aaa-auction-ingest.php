@@ -346,32 +346,58 @@ if (isset($_GET['survey'])) {
         $ours[rawurldecode($w['h'])] = array('today' => (int) $w['td'], 'all' => (int) $w['al']);
     }
     $q->close();
+    /* The rhythm of PB's own harvester (the owner, 30 Sep: "B ko bhi waisa hi karo jaise A"): the
+       fetcher surveys every ten minutes, and a hall is read by what it is -
+         - our lots selling there today: every 15 min 08-20 JST (results, sold cars leaving), 3 h at night;
+         - never read, with lots nobody holds: now;
+         - its survey count moved since our last read (lots added or withdrawn): now, but at most
+           every 30 min - a page here is 20 lots, PB's is 100;
+         - otherwise tomorrow's every 2 h, later days' every 4 h;
+         - PB (and we) already hold as many for that day and hall, and none of it is ours: never.
+       The "moved" test compares the SURVEY's count with the survey's count at our last read - never
+       with a read's own total: a hall under three weekdays (Aux Mobility: 698 a day, 863 read) never
+       matched, and was read at every pass all night. At 80% of the day's share every wait doubles,
+       as PB's harvester slows at 80% of its own, so the day never runs dry. */
     $hour = (int) (new DateTime('now', new DateTimeZone('Asia/Tokyo')))->format('G');
+    $day = $hour >= 8 && $hour < 20;
+    $slow = ((int) ($in['budget'] ?? 0) > 0 && (int) ($in['used'] ?? 0) > 0.8 * (int) $in['budget']) ? 2 : 1;
+    $tomorrow = (new DateTime($today . ' 12:00'))->modify('+1 day')->format('Y-m-d');
     $due = array();
     foreach ($halls as $name => $h) {
         $last   = $st['halls'][$name] ?? array();
         $lastAt = (int) ($last['at'] ?? 0);
-        $lastN  = isset($last['n']) ? (int) $last['n'] : -1;
+        $lastSn = isset($last['sn']) ? (int) $last['sn'] : -1;       // the survey's count when we last read it
+        $age    = $now - $lastAt;
         $o      = $ours[$name] ?? array('today' => 0, 'all' => 0);
-        if ($o['today'] > 0 && $hour >= 8 && $hour < 19 && $now - $lastAt >= 60 * 60) {
-            $due[] = array('hall' => $name, 'count' => $h['n'], 'why' => 'results', 'p' => 1000000);
+        $pbN    = $pb[$h['date'] . '|' . strtolower(trim(aucHall($name, $st)))] ?? 0;
+        $missing = $h['n'] - $pbN - $o['all'];
+        $first  = ($pbN === 0 ? 100000 : 0) + max(0, $missing);     // halls PB lacks altogether first
+        if ($o['today'] > 0 && $age >= ($day ? 15 * 60 : 3 * 3600) * $slow) {
+            $due[] = array('hall' => $name, 'count' => $h['n'], 'pb' => $pbN, 'why' => 'results', 'p' => 4000000 + $first);
             continue;
         }
-        if ($lastN === $h['n'] && $now - $lastAt < 86400) { continue; }
-        $pbN = $pb[$h['date'] . '|' . strtolower(trim(aucHall($name, $st)))] ?? 0;
-        $missing = $h['n'] - $pbN - $o['all'];
-        if ($missing <= 0) { continue; }
-        if ($h['date'] > $today && $now - $lastAt < 3 * 3600) { continue; }
-        if ($pbN > 0) {
-            /* A hall PB lists too, short for now: PB fills its list over the days before a
-               sale, so reading a 4,000-lot hall for the difference is worth it only from the
-               day before the sale on - by then what is still missing is missing. */
-            $tomorrow = (new DateTime($today . ' 12:00'))->modify('+1 day')->format('Y-m-d');
-            if ($h['date'] > $tomorrow) { continue; }
-            $due[] = array('hall' => $name, 'count' => $h['n'], 'pb' => $pbN, 'why' => 'missing ' . $missing, 'p' => $missing);
-        } else {
-            // a hall PB does not list at all: every lot of it is new to the portal - first
-            $due[] = array('hall' => $name, 'count' => $h['n'], 'pb' => 0, 'why' => 'not on PB, ' . $missing, 'p' => 100000 + $missing);
+        if ($missing <= 0 && $o['all'] === 0) { continue; }         // PB has all of it, none of it is ours
+        if (!$lastAt) {
+            if ($missing > 0) {
+                $due[] = array('hall' => $name, 'count' => $h['n'], 'pb' => $pbN, 'why' => 'new, ' . $missing, 'p' => 3000000 + $first);
+            }
+            continue;
+        }
+        if ($lastSn >= 0 && $lastSn !== $h['n'] && $age >= 30 * 60 * $slow) {
+            $due[] = array('hall' => $name, 'count' => $h['n'], 'pb' => $pbN, 'why' => 'moved ' . $lastSn . '->' . $h['n'],
+                           'p' => 2000000 + $first);
+            continue;
+        }
+        if ($pbN > 0 && $o['all'] === 0 && $h['date'] > $tomorrow) {
+            /* A hall PB lists too, short for now: PB fills its list over the days before a sale, so
+               a big shared hall is read for the difference only from the day before the sale on. */
+            continue;
+        }
+        // (a sale day's hall with lots of ours is the "results" case above; without, hourly by day)
+        $every = ($h['date'] <= $today ? ($day ? 3600 : 3 * 3600) : ($h['date'] === $tomorrow ? 2 * 3600 : 4 * 3600)) * $slow;
+        if ($age >= $every) {
+            $due[] = array('hall' => $name, 'count' => $h['n'], 'pb' => $pbN, 'why' => 'due, missing ' . $missing,
+                           'p' => 1000000 + $first);
         }
     }
     usort($due, function ($a, $b) { return $b['p'] - $a['p']; });
@@ -459,11 +485,12 @@ if (isset($_GET['done'])) {
         $q->execute();
         $retired = max(0, $q->affected_rows);
         $q->close();
-        $st['halls'][$hall] = array('n' => $count, 'at' => time());
+        $st['halls'][$hall] = array('n' => $count, 'at' => time(), 'sn' => (int) ($in['sn'] ?? -1));
     } else {
         // a read cut short: remember when (no re-read for a while), not what it saw
-        $st['halls'][$hall] = array('n' => (int) ($st['halls'][$hall]['n'] ?? -1), 'at' => time());
+        $st['halls'][$hall] = array('n' => (int) ($st['halls'][$hall]['n'] ?? -1), 'at' => time(), 'sn' => (int) ($in['sn'] ?? -1));
     }
+    // sn: the SURVEY's count for the hall when it was read - what the next survey is compared with
     aucSave($st);
     aucOut(array('retired' => $retired, 'capped' => $retired >= $cap));
 }
