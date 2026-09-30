@@ -329,8 +329,21 @@ function aucDateOf($dom, $today) {
     }
     return $today;
 }
+/** The last survey as the source gave it - every hall's count under each weekday - kept for the
+    owner's questions ("of aaajapan's lots on sale, how many are not on PB?"). A whole copy only. */
+function aucKeepSurvey(array $in) {
+    $f = dirname(__DIR__) . '/aaa-fetch/auction-survey.json';
+    $json = json_encode(array('at' => time(), 'onsale' => (int) ($in['onsale'] ?? 0), 'halls' => (array) ($in['halls'] ?? array())),
+                        JSON_INVALID_UTF8_SUBSTITUTE);
+    if ($json === false) { return; }
+    $tmp = $f . '.' . getmypid() . '.tmp';
+    $w = @file_put_contents($tmp, $json);
+    clearstatcache(true, $tmp);
+    if ($w === strlen($json) && is_file($tmp) && filesize($tmp) === strlen($json)) { @rename($tmp, $f); } else { @unlink($tmp); }
+}
 if (isset($_GET['survey'])) {
     $in = aucIn();
+    aucKeepSurvey($in);
     $today = aucToday();
     $now = time();
     $halls = array();                       // hall -> count and day (a hall under several days: its largest)
