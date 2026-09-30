@@ -163,7 +163,7 @@ function aucMerge($conn, $ourCarId, $pbCarId) {
 function aucOthers($conn, $day, $lot) {
     static $q = null;
     if ($q === null) {
-        $q = $conn->prepare("SELECT car_id, auction, make, model, year, mileage FROM cars
+        $q = $conn->prepare("SELECT car_id, auction, make, model, year, mileage, chassis FROM cars
                               WHERE auction_on = ? AND lot_no = ?
                                 AND (source_url IS NULL OR source_url NOT LIKE 'https://bid.aaajapan.com%')");
     }
@@ -171,39 +171,62 @@ function aucOthers($conn, $day, $lot) {
     $q->execute();
     return $q->get_result()->fetch_all(MYSQLI_ASSOC);
 }
+/** Both mileages known and within 1,000 km or 2% (PB rounds to thousands). */
+function aucSameKm($k1, $k2) {
+    $k1 = (int) $k1; $k2 = (int) $k2;
+    return $k1 > 0 && $k2 > 0 && abs($k1 - $k2) <= max(1000, (int) (0.02 * max($k1, $k2)));
+}
 /** Do the two sheets describe one car - the year, the mileage? At least one known on both
-    sides, and none of the known ones disagreeing (mileage within 1,000 km or 2%). */
+    sides, and none of the known ones disagreeing. A year exactly 30 apart counts as the same:
+    PB's model_year_en reads some Reiwa years as Heisei (a 2020 car as 1990 - seen 30 Sep). */
 function aucSameCar(array $o, $year, $km) {
     $y1 = (int) ($o['year'] ?? 0);    $y2 = (int) $year;
     $k1 = (int) ($o['mileage'] ?? 0); $k2 = (int) $km;
     $hasY = $y1 > 0 && $y2 > 0;
     $hasK = $k1 > 0 && $k2 > 0;
     if (!$hasY && !$hasK) { return false; }
-    if ($hasY && $y1 !== $y2) { return false; }
-    if ($hasK && abs($k1 - $k2) > max(1000, (int) (0.02 * max($k1, $k2)))) { return false; }
+    if ($hasY && $y1 !== $y2 && abs($y1 - $y2) !== 30) { return false; }
+    if ($hasK && !aucSameKm($k1, $k2)) { return false; }
     return true;
+}
+/** A make that names nothing: PB files machinery, boats and the like under OTHER, the source OTHERS. */
+function aucGenericMake($m) {
+    $k = aucKey($m);
+    return $k === '' || $k === 'OTHER' || $k === 'OTHERS';
+}
+/**
+ * Same hall, day and lot number: ONE lot - unless the two rows plainly describe different cars:
+ * two real makes that differ, and neither the chassis code nor the mileage saying they are one.
+ * The feeds spell makes and models their own ways ("OTHERS" / "OTHER" for a forklift, "HITACHI"
+ * / "OTHER", "NISSAN" / "NISSAN DIESEL"); that is not a second car. A wrong hall name (29 Sep:
+ * Aux Mobility read as MIRIVE Saitama) shows as exactly this kind of plain difference.
+ */
+function aucSameLot(array $o, $make, $km, $chassis) {
+    if (aucKey($o['make']) === aucKey($make) || aucSameKm($o['mileage'] ?? 0, $km)) { return true; }
+    $c1 = aucKey($o['chassis'] ?? '');
+    if ($c1 !== '' && $c1 === aucKey($chassis)) { return true; }
+    return aucGenericMake($o['make']) || aucGenericMake($make);
 }
 /**
  * Is one of those the same car? PB's row, or null.
  *
- * The first live read (29 Sep) matched on the hall alone once a hall's PB name was learnt, and
- * the name was learnt from make + model alone at ANY hall: a few common kei cars sharing a lot
- * number taught "Aux Mobility = MIRIVE Saitama", and from then on every Aux Mobility lot whose
- * number PB's MIRIVE Saitama also had (it has ~3,000 a day) counted as PB's - 390 lots dropped,
- * 289 shown under the wrong hall. Now the car itself must agree too: in the same hall its make
- * and model (or make, year and mileage); in another hall make, model, year and mileage.
+ * In the same hall (PB's name for it) a day's lot number is one lot (aucSameLot). The model is not
+ * asked there - the feeds spell it differently ("UD SERIES" / "UD", "CARAVAN VAN" / "NV350
+ * CARAVAN"): on 30 Sep asking for it left 108 lots listed twice, and asking for the make left 181
+ * machinery lots. In ANOTHER hall a lot number means nothing: make, model, year and mileage must
+ * all agree (29 Sep: make + model alone taught "Aux Mobility = MIRIVE Saitama" from a few kei cars
+ * and dropped 390 lots).
  */
-function aucSame(array $others, $pbHall, $make, $model, $year = 0, $km = 0) {
+function aucSame(array $others, $pbHall, $make, $model, $year = 0, $km = 0, $chassis = '') {
     $fit = array();
     foreach ($others as $o) {
-        $mk  = aucKey($o['make']) === aucKey($make);
-        $md  = $mk && aucSameModel($o['model'], $model);
-        $car = aucSameCar($o, $year, $km);
         if (strcasecmp(trim($o['auction']), $pbHall) === 0) {
-            if ($md || ($mk && $car)) { return $o; }
-            continue;                    // the same number, another car: not this one
+            if (aucSameLot($o, $make, $km, $chassis)) { return $o; }
+            continue;                    // the same number, plainly another car: not this one
         }
-        if ($md && $car) { $fit[] = $o; }
+        if (aucKey($o['make']) === aucKey($make) && aucSameModel($o['model'], $model) && aucSameCar($o, $year, $km)) {
+            $fit[] = $o;
+        }
     }
     return count($fit) === 1 ? $fit[0] : null;
 }
@@ -319,28 +342,54 @@ if (isset($_GET['survey'])) {
 
 /* -------------------------------------------- a lot PB lists too: fold ours into PB's */
 if (isset($_GET['dedupe'])) {
+    /* Per sale day: our rows, then PB's rows of that day with those lot numbers (the auction_on
+       index, lot_no IN (...)), and each of ours judged by the rule a new row meets (aucSame).
+       The self-join this replaces read every PB row of the day for each of ours - past 90 s, so
+       every pass from 29 Sep 18:20 UTC timed out on it: no copy was folded (108 listed twice by
+       30 Sep) and the signal went red. This: ~0.2 s for 1,600 of ours. */
     $merged = 0;
-    $r = $conn->query("SELECT a.car_id ours, a.make am, a.model amo, a.auction ah, a.year ay, a.mileage akm,
-                              p.car_id pb, p.make pm, p.model pmo, p.auction ph, p.year, p.mileage
-                         FROM cars a
-                         JOIN cars p ON p.auction_on = a.auction_on AND p.lot_no = a.lot_no AND p.id <> a.id
-                        WHERE a.source_url LIKE 'https://bid.aaajapan.com%' AND a.auction_on >= CURDATE() - INTERVAL 1 DAY
-                          AND p.source_url LIKE 'https://pacificboeki.jp%'");
-    $pairs = $r ? $r->fetch_all(MYSQLI_ASSOC) : array();
-    $done = array();
-    foreach ($pairs as $p) {
-        if (isset($done[$p['ours']])) { continue; }
-        // the rule a new row meets (aucSame): the car must agree, never the lot number alone
-        $mk   = aucKey($p['am']) === aucKey($p['pm']);
-        $md   = $mk && aucSameModel($p['amo'], $p['pmo']);
-        $car  = aucSameCar($p, $p['ay'], $p['akm']);
-        $same = strcasecmp(trim($p['ah']), trim($p['ph'])) === 0 ? ($md || ($mk && $car)) : ($md && $car);
-        if ($same) {
-            $merged += aucMerge($conn, $p['ours'], $p['pb']);
-            $done[$p['ours']] = true;
+    $would = array();
+    $ours = $conn->query("SELECT car_id, auction_on, lot_no, auction, make, model, year, mileage, chassis, source_url FROM cars
+                           WHERE car_id LIKE 'aj-%' AND source_url LIKE 'https://bid.aaajapan.com%'
+                             AND auction_on >= CURDATE() - INTERVAL 1 DAY");
+    $byDay = array();
+    while ($ours && $o = $ours->fetch_assoc()) { $byDay[$o['auction_on']][$o['lot_no']][] = $o; }
+    foreach ($byDay as $day => $lots) {
+        $in = implode(',', array_map(function ($l) use ($conn) { return "'" . $conn->real_escape_string((string) $l) . "'"; },
+                                     array_keys($lots)));
+        $q = $conn->query("SELECT car_id, lot_no, auction, make, model, year, mileage, chassis FROM cars
+                            WHERE auction_on = '" . $conn->real_escape_string($day) . "' AND lot_no IN ($in)
+                              AND source_url LIKE 'https://pacificboeki.jp%'");
+        $pb = array();
+        while ($q && $p = $q->fetch_assoc()) { $pb[$p['lot_no']][] = $p; }
+        foreach ($pb as $lot => $others) {
+            foreach ($lots[$lot] ?? array() as $a) {
+                // its hall as written (PB's name when it was known), else PB's name for it now
+                $same = aucSame($others, trim($a['auction']), $a['make'], $a['model'], (int) $a['year'], (int) $a['mileage'],
+                                (string) $a['chassis']);
+                if (!$same) {
+                    parse_str((string) parse_url($a['source_url'], PHP_URL_QUERY), $qs);    // h = the source's hall
+                    $now = aucHall((string) ($qs['h'] ?? ''), $st);
+                    if ($now !== '' && strcasecmp($now, trim($a['auction'])) !== 0) {
+                        $same = aucSame($others, $now, $a['make'], $a['model'], (int) $a['year'], (int) $a['mileage'],
+                                        (string) $a['chassis']);
+                    }
+                }
+                if ($same && isset($_GET['dry'])) {
+                    // dedupe=1&dry=1: what WOULD fold, touching nothing - see a new rule before it acts
+                    $merged++;
+                    if (count($would) < 60) {
+                        $would[] = array($a['car_id'], $same['car_id'], $a['auction'] . ' / ' . $same['auction'],
+                                         $a['make'] . ' ' . $a['model'] . ' / ' . $same['make'] . ' ' . $same['model'],
+                                         $a['chassis'] . ' / ' . $same['chassis'], $a['mileage'] . ' / ' . $same['mileage']);
+                    }
+                } elseif ($same) {
+                    $merged += aucMerge($conn, $a['car_id'], $same['car_id']);
+                }
+            }
         }
     }
-    aucOut(array('merged' => $merged));
+    aucOut(isset($_GET['dry']) ? array('would' => $merged, 'samples' => $would) : array('merged' => $merged));
 }
 
 /* ------------------------------------------------ a hall read whole: retire the unseen */
@@ -433,7 +482,7 @@ if (isset($_GET['rows'])) {
         // Does PB hold this car? Then it is PB's - and a copy of ours folds into it.
         $year  = aucNum($r['g'] ?? '', 2100);
         $km    = aucNum($r['q'] ?? '', 3000000) ?? 0;
-        $same = aucSame(aucOthers($conn, $day, $lot), $pbHall, $make, $model, (int) $year, (int) $km);
+        $same = aucSame(aucOthers($conn, $day, $lot), $pbHall, $make, $model, (int) $year, (int) $km, aucText($r['j'] ?? ''));
         if ($same) {
             $out['pb']++;
             // A vote: the source's `$hall` is PB's `$v` - how the hall filter keeps one name.
