@@ -71,6 +71,12 @@ the customer's bids kept.
   read, or - on its sale day - to pick up results; pages at the Statistics' pace (1.5 s)
   under a daily sub-allowance inside today's 16,000; stop on the first refusal.
 - **FR-007** Nothing about the Statistics changes.
+- **FR-009** (owner, 30 Sep: "B ko bhi waisa hi karo jaise A") B is read on PB's harvester's rhythm:
+  a survey every 10 min; today's halls holding our lots every 15 min 08-20 JST (results), 3 h at night;
+  a never-read hall with lots nobody holds at once; a hall whose survey count moved at once (at most
+  every 30 min); tomorrow's every 2 h, later days' every 4 h; a hall PB holds entirely (none ours)
+  never. Every wait doubles past 80% of the day's share. Share 8,000/day (repo variable), 300 per
+  pass, 1.5 s pace, one sign-in per run, 24 h stop on any refusal.
 - **FR-008** (owner, 29 Sep) The auction keeps ONE staff signal over both feeds: green
   "Auction working" with no name while both work; red naming the feed at fault - "PB Auction
   not working", "aaajapan Auction not working", "PB + aaajapan Auction not working". The
