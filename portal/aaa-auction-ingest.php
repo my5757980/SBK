@@ -71,12 +71,28 @@ function aucState() {
     echo json_encode(array('ok' => false, 'error' => 'the hall state could not be read - try again'));
     exit;
 }
+/**
+ * Save the hall state: the whole file swapped in only when the copy beside it is complete. This
+ * host has twice (30 Sep, 07:38 and 09:03 UTC) answered a write with "No such file or directory"
+ * and left an EMPTY file behind - once in place (the state wiped), once as the copy then renamed
+ * over the state. So: encode, write the copy, read its size back, and rename only a whole copy;
+ * otherwise the old state stays and the failure is logged.
+ */
 function aucSave(array $s) {
     $d = dirname(__DIR__) . '/aaa-fetch';
     if (!is_dir($d)) { @mkdir($d, 0750, true); }
     $f = $d . '/auction-halls.json';
-    @file_put_contents($f . '.' . getmypid() . '.tmp', json_encode($s));
-    @rename($f . '.' . getmypid() . '.tmp', $f);
+    $tmp = $f . '.' . getmypid() . '.tmp';
+    $json = json_encode($s, JSON_INVALID_UTF8_SUBSTITUTE);
+    $w = ($json === false) ? false : @file_put_contents($tmp, $json);
+    clearstatcache(true, $tmp);
+    if ($json === false || $w !== strlen($json) || !is_file($tmp) || filesize($tmp) !== strlen($json)) {
+        @unlink($tmp);
+        error_log('aaa-auction-ingest: the hall state was NOT saved (' . ($json === false ? json_last_error_msg()
+                  : 'wrote ' . var_export($w, true) . ' of ' . strlen($json) . ' bytes') . ') - the old one is kept');
+        return false;
+    }
+    return @rename($tmp, $f);
 }
 function aucOut(array $a) { echo json_encode($a + array('ok' => true)); exit; }
 function aucIn() {
