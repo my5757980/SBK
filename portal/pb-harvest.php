@@ -499,6 +499,24 @@ function mapLot(array $r) {
 }
 
 /**
+ * May PB's lot $c take over this row that carries no PB code? A jpauc row: as always (lot, make
+ * and model on the day). A second-feed row (aaajapan, `aj-`, spec 009): only the same lot - its
+ * hall is PB's hall, or its mileage is PB's. Lot + make + model alone let USS Tokyo (~10,000 lots
+ * a day, N-BOXes and TANTOs under every number) take 14 of 2,386 from other halls, 29-30 Sep.
+ */
+function pbMayAdopt(array $row, array $c) {
+    if (strpos((string) $row['car_id'], 'aj-') !== 0) {
+        return true;
+    }
+    if (strcasecmp(trim((string) $row['auction']), trim((string) $c['hall'])) === 0) {
+        return true;
+    }
+    $k1 = (int) $row['mileage'];
+    $k2 = (int) $c['km'];
+    return $k1 > 0 && $k2 > 0 && abs($k1 - $k2) <= max(1000, (int) (0.02 * max($k1, $k2)));
+}
+
+/**
  * Write one page of lots. A lot we already hold - from jpauc or from an earlier
  * read - is updated where it stands; only a lot with no match is inserted.
  * In a dry run nothing is written and the would-be outcome is counted instead.
@@ -542,7 +560,7 @@ function storeLots($conn, array $rows, $dry, array &$st) {
                 // same lot, make and model on the same day is the same car - but
                 // only when exactly one row fits; two could be two houses' lots.
                 $bk = lotKey($c['lot']) . '|' . strtoupper($c['make']) . '|' . strtoupper($c['model']);
-                if (isset($bare[$bk]) && count($bare[$bk]) === 1) {
+                if (isset($bare[$bk]) && count($bare[$bk]) === 1 && pbMayAdopt($bare[$bk][0], $c)) {
                     $old = $bare[$bk][0];
                     unset($bare[$bk]);
                 }
