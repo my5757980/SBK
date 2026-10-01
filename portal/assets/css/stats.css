@@ -134,6 +134,19 @@ a.st-sort.is-on{color:#b3651a}
   .st-range{grid-template-columns:96px 1fr 1fr}
   .st-per{margin-left:0}
 }
+/* Phones, 1 Oct 2026 sweep: "Show 30 50 100", the sort headings and a row's
+   maker and model were 17-19px tall - under a thumb. Vertical padding on an
+   inline link grows where a finger lands without moving the line it sits in. */
+@media (max-width:480px){
+  .st-per a, a.st-sort, a.st-open{padding-block:6px}
+}
+/* On a phone every box of the form takes the full width (style.css, .admin-toolbar)
+   except the two years, which keep their desktop 92px and 70px from the page's
+   inline style and left most of their row empty. Half each, on one row. */
+@media (max-width:520px){
+  .pb-stats-form input[name="y1"],
+  .pb-stats-form input[name="y2"]{width:calc(50% - 4px)!important}
+}
 
 /* ---------- a sale's own page, laid out as the source lays its own ------------
    The owner, 25 September 2026: "the detail page exactly like the statistics
@@ -216,4 +229,15 @@ a.st-sort.is-on{color:#b3651a}
   .sd2-photos{order:2}
   .sd2-tokyo{font-size:15px}
   .sd2-legend{font-size:12px}
+}
+/* Phones, 1 Oct 2026 sweep: Home / Close / Prev / Next were 26px, "copy info"
+   16px, Find 27px and the auction-sheet guide's heading 20px - under a thumb.
+   The heading's dashed rule becomes an underline, so the padding that grows it
+   does not push the rule off the words. (After the rules above, so it wins.) */
+@media (max-width:480px){
+  .sd2-btn{padding:6px 12px}
+  .sd2-copy{padding-block:7px}
+  .sd2-find{min-height:32px}
+  .sd2-legend-h{padding:6px 0;border-bottom:0;
+    text-decoration:underline dashed #b3651a;text-underline-offset:3px}
 }

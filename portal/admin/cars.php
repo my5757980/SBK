@@ -104,7 +104,7 @@ require_once '_header.php';
 
 <form method="GET" class="admin-toolbar">
   <input type="text" name="search" class="input" placeholder="Make, model, lot no., chassis model or number, ID"
-         value="<?php echo sanitize($search); ?>" style="min-width:320px">
+         value="<?php echo sanitize($search); ?>" style="min-width:min(320px,100%)">
   <select name="status" class="select">
     <option value="">Any status</option>
     <?php foreach (array('available','sold','unsold','negotiate sold','cancel','withdrawn','removed') as $s): ?>

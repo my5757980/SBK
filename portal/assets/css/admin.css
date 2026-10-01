@@ -1,0 +1,46 @@
+/* The desk's own styles - every admin/ page loads this after style.css
+   (admin/_header.php). A file of its own so that nothing the auction loads is
+   changed by it (the client, 24 September 2026: "don't touch the auction module
+   at all").
+
+   Everything here came from the 1 October 2026 sweep: every desk screen opened
+   at ten widths from a 320px phone to a 2560px monitor, measured
+   (sbk-tools/responsivecheck.py) and LOOKED AT (sbk-tools/respsheets.py). */
+
+/* ---- tables: words whole, and the table scrolls ---------------------------
+   style.css lets a desk table's cell break ANYWHERE, so the table always fits
+   its card. On a phone that read "JEEP WRAN GLER UNLIMI TED", "BID -20 26- 819
+   253" and "jd38853 25@gm ail.com". A name broken mid-word is harder to read
+   than one that needs a scroll, and .table-responsive is there to scroll it -
+   the staff table already works this way. */
+@media (max-width:760px){
+  .table-responsive > .dashboard-table th,
+  .table-responsive > .dashboard-table td{overflow-wrap:normal}
+  /* A reference - BID-2026-819253 - is read and copied whole, not in three lines. */
+  .table-responsive > .dashboard-table td.mono{white-space:nowrap}
+}
+
+/* ---- the menu strip --------------------------------------------------------
+   Up to 900px the menu is a strip across the top, and an OPEN entry - Staff, on
+   its own pages - stood its two links underneath itself: the strip grew into a
+   140px dark band with the visible entries floating in the middle of it. In the
+   strip the open entry shows its links in its own place, side by side. */
+@media (max-width:900px){
+  .admin-nav .nav-drop{flex:0 0 auto;margin-bottom:0}
+  .admin-nav .nav-drop[open] > summary{display:none}
+  .admin-nav .nav-drop[open] > .nav-kids{display:flex;gap:6px;padding:0}
+}
+
+/* ---- phones: legible, and reachable ---------------------------------------- */
+@media (max-width:480px){
+  /* A form's field names are 10.5px capitals - under what can be read at arm's
+     length; 11.5px, as style.css already does for the other small labels. The
+     "Active" tick box and the required star sit inside a label, so they follow. */
+  .field label{font-size:11.5px}
+  /* An enquiry's e-mail and telephone are things to tap, and were 18px tall.
+     Vertical padding on an inline link grows where a finger lands without
+     moving the line it sits in. */
+  .admin-main dd a{padding-block:6px}
+  /* ...and so is each of the client's other enquiries, listed under one (20px). */
+  .enq-others a{padding-block:6px}
+}
