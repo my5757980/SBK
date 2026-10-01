@@ -470,6 +470,12 @@ button{font:inherit;color:inherit}
 .pane-head .nm span.live{color:var(--live);font-weight:600}
 /* The desk's header keeps the customer's e-mail and adds presence after it. */
 .pane-head .nm span i.on-now{font-style:normal;color:var(--live);font-weight:600;margin-left:2px}
+/* On a 320-390px phone the address, "Online now" and the two call buttons do
+   not fit on one line. "Online now" used to wrap into three lines and push the
+   name out of the top of the bar (1 Oct sweep); now the ADDRESS gives way, with
+   an ellipsis - copying it still copies all of it. */
+.pane-head .nm span i.mail{font-style:normal;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pane-head .nm span i.on-now{flex:0 0 auto;white-space:nowrap}
 .pane-head .nm span.live::before{
   content:"";width:7px;height:7px;border-radius:50%;background:var(--live);flex:0 0 auto;
 }
@@ -521,7 +527,9 @@ button{font:inherit;color:inherit}
   background:#e7ebf1;transition:transform var(--mid) var(--ease), filter var(--mid) var(--ease);
 }
 .bub img.photo:hover{transform:scale(1.012);filter:brightness(1.03)}
-.bub audio{display:block;width:262px;margin:3px 0}
+/* max-width: on a 320px phone the bubble is 254px, and a 262px player hung out
+   of it to the screen's edge. */
+.bub audio{display:block;width:262px;max-width:100%;margin:3px 0}
 
 .foot{
   display:flex;align-items:center;justify-content:flex-end;gap:5px;
@@ -732,6 +740,24 @@ button{font:inherit;color:inherit}
   .compose textarea{padding:11px 13px}
 }
 
+/* The writing bar on a phone, measured 1 Oct: at 360px (the commonest Android)
+   "Write a message…" wrapped onto a hidden second line, and while a voice note
+   was RECORDING the bar's hint pushed the send button off the right edge of
+   every phone up to 390px. Round buttons stay a full 40px - a thumb's width. */
+@media (max-width:400px){
+  .compose{padding:8px;gap:5px}
+  .compose .tool{width:40px;height:40px}
+  .compose textarea{min-height:40px;padding:9px 11px}
+  .rec-bar{height:40px;padding:0 12px;gap:8px}
+}
+@media (max-width:520px){
+  .rec-bar > span:last-child{display:none}            /* "tap the square to send" */
+}
+@media (max-width:360px){
+  .rec-bar > span:nth-child(2){font-size:0}           /* "Recording…" - the red bar says it */
+  .rec-bar > span:nth-child(2) b{font-size:14px}      /* the time stays */
+}
+
 /* ---- calls ---------------------------------------------------------------
 
    The two buttons in the conversation's header, and the screen a call lives on.
@@ -872,6 +898,8 @@ html.framed .gate-body{padding:4px 22px 24px}
   transition:background var(--fast) var(--ease), color var(--fast) var(--ease);
 }
 .side-new:hover{background:var(--navy);color:#fff}
+/* chat.js puts the heading and the + in this box together (see there). */
+.side-top{position:relative;flex:0 0 auto}
 .side-new:focus-visible{outline:2px solid var(--navy-lt);outline-offset:2px}
 
 /* A room is not a person, and the corner says so before the name is read. */
@@ -967,8 +995,12 @@ html.framed .gate-body{padding:4px 22px 24px}
    edge - the owner's rule is that nothing, however small, breaks. */
 @media (max-width:480px){
   .gdlg{padding:12px}
+  /* The whole height of the phone, less the 12px frame (86vh left "Add to group"
+     cut in half on a 320px phone, 1 Oct), and a shorter list so the buttons
+     under it are in sight. */
+  .gdlg-box{max-height:calc(100vh - 24px);max-height:calc(100dvh - 24px)}
   .gdlg-body{padding:12px 13px 14px}
-  .gpick-list{max-height:40vh}
+  .gpick-list{max-height:min(30vh,232px)}
   .gdlg-do{justify-content:stretch}
   .gdlg-do .gbtn{flex:1}
   .grow .gbtn-thin{flex:0 0 auto}
@@ -1025,4 +1057,8 @@ html.framed .gate-body{padding:4px 22px 24px}
 
 @media (max-width:760px){
   .notice-stack{top:66px;left:12px;right:12px;width:auto}
+}
+/* The cross on "Pop-up alerts are blocked" was 26px - under a thumb's 28. */
+@media (max-width:480px){
+  .notify-ask .x{width:30px;height:30px}
 }
