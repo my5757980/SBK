@@ -26,6 +26,17 @@ var emojiPad = el('emojiPad'), recBar = el('recBar'), recTime = el('recTime');
 var headAv = el('headAv'), headName = el('headName'), headSub = el('headSub');
 var bellDot = el('bellDot'), body = el('body'), backBtn = el('backBtn');
 
+/* A 320px phone has room for "Message…" beside the four round buttons, not for
+   "Write a message…": cut in half, the box read as broken (1 Oct sweep). Kept
+   up to date as the window changes - a phone turned on its side, a split screen. */
+var narrowQ = box && window.matchMedia ? window.matchMedia('(max-width:340px)') : null;
+function fitPlaceholder() { box.placeholder = narrowQ.matches ? 'Message…' : 'Write a message…'; }
+if (narrowQ) {
+  fitPlaceholder();
+  if (narrowQ.addEventListener) { narrowQ.addEventListener('change', fitPlaceholder); }
+  else if (narrowQ.addListener) { narrowQ.addListener(fitPlaceholder); }
+}
+
 var state = {
   thread: 0,          // which conversation is open
   group: 0,           // or which group - never both, the pane holds one
@@ -612,7 +623,10 @@ function syncHead(people, list) {
       if (list[i].id === state.thread) {
         var mail = list[i].email || '';
         var on   = !!list[i].online;
-        var html = esc(mail) + (on ? ' <i class="on-now">· Online now</i>' : '');
+        /* The address in its own box so a phone can cut IT short, not wrap
+           "Online now" into three lines that push the name out of the bar. */
+        var html = '<i class="mail">' + esc(mail) + '</i>'
+                 + (on ? ' <i class="on-now">· Online now</i>' : '');
         if (headSub.getAttribute('data-sig') !== html) {
           headSub.innerHTML = html;
           headSub.setAttribute('data-sig', html);
@@ -1927,7 +1941,19 @@ if (!isGuest) {
     plus.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"'
       + ' stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
     plus.addEventListener('click', newGroupBox);
-    sideBox.appendChild(plus);
+    /* The heading and its + share one box, so whatever is put above the heading
+       - the "pop-up alerts are blocked" note - moves both together. Placed
+       against the whole list, the + stayed at the top and sat on that note's
+       corner (1 Oct sweep). */
+    if (sideHead && sideHead.parentNode === sideBox) {
+      var sideTop = document.createElement('div');
+      sideTop.className = 'side-top';
+      sideBox.insertBefore(sideTop, sideHead);
+      sideTop.appendChild(sideHead);
+      sideTop.appendChild(plus);
+    } else {
+      sideBox.appendChild(plus);
+    }
   }
   if (headName && headName.parentNode) {
     headName.parentNode.classList.add('head-who');
