@@ -44,35 +44,45 @@ function vizFunnel(array $rows) {
     if (!$rows) { return '<p class="hint">Nothing to show yet.</p>'; }
 
     $max = max(1, max(array_column($rows, 1)));
-    $rowH = 44; $barH = 22; $labelW = 132; $valueW = 96;
-    $w = 640; $h = count($rows) * $rowH + 8;
-    $plotW = $w - $labelW - $valueW;
-
-    $out = '<svg class="viz" viewBox="0 0 ' . $w . ' ' . $h . '" role="img" '
-         . 'aria-label="Client stages" preserveAspectRatio="xMinYMin meet">';
-
+    $bars = array();
     foreach ($rows as $i => $r) {
-        list($label, $value, $note) = array($r[0], (int) $r[1], $r[2] ?? '');
-        $y = $i * $rowH + 6;
-        // 2px of surface below each bar keeps neighbours apart without drawing
-        // a border around them.
-        $barW = $max > 0 ? max(0, round($plotW * $value / $max)) : 0;
-        $fill = VIZ_RAMP[min($i, count(VIZ_RAMP) - 1)];
-
-        $out .= '<text x="0" y="' . ($y + $barH - 6) . '" class="viz-lab">' . vizEsc($label) . '</text>';
-        // A zero stage still gets a hairline, so the row does not look missing.
-        if ($barW < 2) {
-            $out .= '<rect x="' . $labelW . '" y="' . ($y + $barH / 2 - 1) . '" width="2" height="2" fill="' . VIZ_MUTED . '"/>';
-        } else {
-            $out .= '<rect x="' . $labelW . '" y="' . $y . '" width="' . $barW . '" height="' . $barH
-                  . '" rx="4" fill="' . $fill . '"/>';
-        }
-        $out .= '<text x="' . ($labelW + max($barW, 2) + 10) . '" y="' . ($y + $barH - 6)
-              . '" class="viz-val">' . number_format($value)
-              . ($note !== '' ? '<tspan class="viz-note"> ' . vizEsc($note) . '</tspan>' : '')
-              . '</text>';
+        $bars[] = array($r[0], (int) $r[1], $r[2] ?? '', VIZ_RAMP[min($i, count(VIZ_RAMP) - 1)]);
     }
-    return $out . '</svg>';
+    return vizHBars($bars, $max, 96, 'stage', 'Client stages');
+}
+
+/**
+ * Horizontal bars, written as HTML rather than drawn as SVG (1 October 2026).
+ *
+ * The SVG was drawn 640 units wide and shrank its writing with it: in a 300px
+ * card - a phone, or half of a tablet - the 13px labels came out at six pixels,
+ * which nobody can read. Here the bars stretch with the card and the words stay
+ * the size they were set. On a desktop it looks as it did.
+ *
+ * Each bar is a share of the track less `$room` pixels, kept at the end for the
+ * figure that follows the bar - the same arrangement the SVG had.
+ *
+ * @param array  $rows [label, value, note, colour] in display order
+ * @param int    $max  the value that fills the track
+ * @param int    $room pixels kept for the figure
+ * @param string $kind 'stage' - taller bars, and a zero still gets a hairline so
+ *                     the row does not look missing - or 'plain'
+ */
+function vizHBars(array $rows, $max, $room, $kind, $aria) {
+    $out = '<div class="viz-hb viz-hb-' . $kind . '" role="img" aria-label="' . vizEsc($aria) . '">';
+    foreach ($rows as $r) {
+        list($label, $value, $note, $fill) = $r;
+        $out .= '<div class="hb-r"><span class="hb-l">' . vizEsc($label) . '</span><span class="hb-t">';
+        if ($value > 0) {
+            $out .= '<i style="width:calc((100% - ' . (int) $room . 'px) * ' . round($value / max(1, $max), 4)
+                  . ');background:' . $fill . '"></i>';
+        } elseif ($kind === 'stage') {
+            $out .= '<i class="hb-zero"></i>';
+        }
+        $out .= '<span class="hb-v">' . number_format($value)
+              . ($note !== '' ? ' <em>' . vizEsc($note) . '</em>' : '') . '</span></span></div>';
+    }
+    return $out . '</div>';
 }
 
 /**
@@ -140,25 +150,9 @@ function vizBars(array $rows) {
         return '<p class="hint">Nothing here yet.</p>';
     }
     $max = max(1, max(array_column($rows, 1)));
-    $rowH = 34; $barH = 16; $labelW = 132; $valueW = 64;
-    $w = 640; $h = count($rows) * $rowH + 4;
-    $plotW = $w - $labelW - $valueW;
-
-    $out = '<svg class="viz" viewBox="0 0 ' . $w . ' ' . $h . '" role="img" '
-         . 'aria-label="Breakdown" preserveAspectRatio="xMinYMin meet">';
-    foreach ($rows as $i => $r) {
-        $y = $i * $rowH + 4;
-        $value = (int) $r[1];
-        $barW = max(0, round($plotW * $value / $max));
-        $out .= '<text x="0" y="' . ($y + $barH - 3) . '" class="viz-lab">' . vizEsc($r[0]) . '</text>';
-        if ($barW >= 2) {
-            $out .= '<rect x="' . $labelW . '" y="' . $y . '" width="' . $barW . '" height="' . $barH
-                  . '" rx="4" fill="' . VIZ_SERIES[0] . '"/>';
-        }
-        $out .= '<text x="' . ($labelW + max($barW, 2) + 10) . '" y="' . ($y + $barH - 3)
-              . '" class="viz-val">' . number_format($value) . '</text>';
-    }
-    return $out . '</svg>';
+    $bars = array();
+    foreach ($rows as $r) { $bars[] = array($r[0], (int) $r[1], '', VIZ_SERIES[0]); }
+    return vizHBars($bars, $max, 64, 'plain', 'Breakdown');
 }
 
 /**
@@ -301,34 +295,21 @@ function vizStackRows(array $rows, array $names) {
     if (!array_sum($totals)) { return '<p class="hint">Nothing to show yet.</p>'; }
 
     $max = max(1, max($totals));
-    $rowH = 40; $barH = 18; $labelW = 150; $valueW = 130;
-    $w = 640; $h = count($rows) * $rowH + 4;
-    $plotW = $w - $labelW - $valueW;
-
-    $out = '<svg class="viz" viewBox="0 0 ' . $w . ' ' . $h . '" role="img" '
-         . 'aria-label="Bids by customer" preserveAspectRatio="xMinYMin meet">';
-
+    // HTML, like vizHBars() and for the same reason: a drawing shrinks its words.
+    $out = '<div class="viz-hb viz-hb-stack" role="img" aria-label="Bids by customer">';
     foreach ($rows as $i => $r) {
-        $y = $i * $rowH + 4;
-        $x = $labelW;
-        $out .= '<text x="0" y="' . ($y + $barH - 3) . '" class="viz-lab">'
-              . vizEsc(mb_strimwidth($r[0], 0, 20, '…')) . '</text>';
-
+        $out .= '<div class="hb-r"><span class="hb-l" title="' . vizEsc($r[0]) . '">' . vizEsc($r[0])
+              . '</span><span class="hb-t">';
         foreach ($r[1] as $k => $v) {
             if ($v <= 0) { continue; }
-            $segW = max(3, round($plotW * $v / $max));
-            // 2px of surface between segments, taken off the width rather than
-            // drawn as a line around each one.
-            $out .= '<rect x="' . $x . '" y="' . $y . '" width="' . ($segW - 2) . '" height="' . $barH
-                  . '" rx="3" fill="' . VIZ_SERIES[$k % count(VIZ_SERIES)] . '"/>';
-            $x += $segW;
+            // 2px of surface between segments (a margin), not a line round each one.
+            $out .= '<i style="width:calc((100% - 130px) * ' . round($v / $max, 4) . ');background:'
+                  . VIZ_SERIES[$k % count(VIZ_SERIES)] . '"></i>';
         }
-        $out .= '<text x="' . ($x + 8) . '" y="' . ($y + $barH - 3) . '" class="viz-val">'
-              . number_format($totals[$i])
-              . ($r[2] !== '' ? '<tspan class="viz-note"> ' . vizEsc($r[2]) . '</tspan>' : '')
-              . '</text>';
+        $out .= '<span class="hb-v">' . number_format($totals[$i])
+              . ($r[2] !== '' ? ' <em>' . vizEsc($r[2]) . '</em>' : '') . '</span></span></div>';
     }
-    return $out . '</svg>';
+    return $out . '</div>';
 }
 
 /**
@@ -376,7 +357,9 @@ function vizWave(array $days, array $names) {
         return round(max(14, min($plotH, $yy)), 1);
     };
 
-    $out = '<svg class="viz" viewBox="0 0 ' . $w . ' ' . $h . '" role="img" '
+    // viz-wave: on a phone its axis figures are set larger, so that shrunk with
+    // the drawing they still read (admin.css).
+    $out = '<svg class="viz viz-wave" viewBox="0 0 ' . $w . ' ' . $h . '" role="img" '
          . 'aria-label="Activity over time" preserveAspectRatio="xMinYMin meet">';
 
     // Three solid hairlines. Nothing dashed - a dashed grid reads as a
