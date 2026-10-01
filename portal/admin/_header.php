@@ -110,6 +110,8 @@ $me = currentStaff();
 <title><?php echo sanitize($page_title); ?> — <?php echo SITE_NAME; ?></title>
 <link rel="icon" type="image/png" href="<?php echo assetV('assets/img/favicon.png'); ?>">
 <link rel="stylesheet" href="<?php echo assetV('assets/css/style.css'); ?>">
+<?php // The desk's own phone rules - its own file, so nothing the auction loads changes. ?>
+<link rel="stylesheet" href="<?php echo assetV('assets/css/admin.css'); ?>">
 <script src="<?php echo assetV('assets/js/source-signal.js'); ?>" defer></script>
 </head>
 <body class="admin-body">
