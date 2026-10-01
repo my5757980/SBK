@@ -420,7 +420,13 @@ if (isset($_GET['survey'])) {
         $pbN    = $pb[$h['date'] . '|' . strtolower(trim(aucHall($name, $st)))] ?? 0;
         $missing = $h['n'] - $pbN - $o['all'];
         $first  = ($pbN === 0 ? 100000 : 0) + max(0, $missing);     // halls PB lacks altogether first
-        if ($o['today'] > 0 && $age >= ($day ? 15 * 60 : 3 * 3600) * $slow) {
+        /* Results cost a hall's EVERY page, however few of its lots are ours: JU Aichi is 170 pages for
+           ~255 of ours, and on 1 Oct it was read 8 times a morning (0 new each time) and the day's share
+           was gone by noon PK. So by size: up to 30 pages every 15 min, up to 80 every 30, beyond hourly
+           (PB's harvester likewise reads its big stock houses less often). */
+        $pages = (int) ceil($h['n'] / 20);
+        $resEvery = $pages <= 30 ? 15 * 60 : ($pages <= 80 ? 30 * 60 : 3600);
+        if ($o['today'] > 0 && $age >= ($day ? $resEvery : 3 * 3600) * $slow) {
             $due[] = array('hall' => $name, 'count' => $h['n'], 'pb' => $pbN, 'why' => 'results', 'p' => 4000000 + $first);
             continue;
         }
