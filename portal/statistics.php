@@ -794,9 +794,11 @@ require_once 'includes/header.php';
                 <?php echo $c['mileage'] ? number_format($c['mileage']) : '—'; ?>
               </td>
               <td>
-                <?php // the gearbox - stored in `grade`, see STAT_COL_TRANS ?>
+                <?php // the gearbox - stored in `grade`, see STAT_COL_TRANS. A drive such as
+                      // "FF,FULLTIME4WD" may break after its comma (<wbr>): left alone, the
+                      // 112px column broke it inside the word, "FULLTIME4W / D" (1 Oct sweep). ?>
                 <?php echo sanitize($c[STAT_COL_TRANS] ?: '—'); ?><?php
-                  if (!empty($c['drive'])): ?> <?php echo sanitize($c['drive']); ?><?php endif; ?>
+                  if (!empty($c['drive'])): ?> <?php echo str_replace(',', ',<wbr>', sanitize($c['drive'])); ?><?php endif; ?>
                 <span class="sub"><?php echo sanitize($c['colour'] ?: ''); ?></span>
               </td>
               <td class="c-grade"><?php echo sanitize($c['rating'] ?: '—'); ?></td>
