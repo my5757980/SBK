@@ -29,6 +29,12 @@ import { C } from './theme';
 
 export const BASE_W = 390;
 
+/* No text below this, whatever the scale. At the 0.92 floor an 11pt label came
+   out at 10 and the 9.5pt GROUP badge at 9 on a 320-360pt phone - read off the
+   screens themselves on 2 October 2026 (sbk-tools/appwebcheck.py). The owner
+   said yes to raising them. Bigger text is scaled exactly as before. */
+export const MIN_TEXT = 11;
+
 /** How much bigger or smaller this screen is than the one it was drawn for. */
 export function scaleFor(width) {
   /* The floor is 0.92, not 0.88. At 0.88 a 48pt button came out 42pt on a 320pt
@@ -66,6 +72,8 @@ export function useUI() {
     landscape: width > height,
     /** A size in design points for this screen. */
     s: (n) => Math.round(PixelRatio.roundToNearestPixel(n * k)),
+    /** A TEXT size: scaled like s(), but never under MIN_TEXT. */
+    t: (n) => Math.max(MIN_TEXT, Math.round(PixelRatio.roundToNearestPixel(n * k))),
     /** The same, but never smaller than a thumb can hit. */
     tap: (n) => tap(n, k),
     /** The reading column: full width on a phone, held in on anything bigger. */
@@ -89,8 +97,9 @@ export const T = {
 /** A heading, a label, a line of body text - with the scale already applied. */
 export function type(name, ui, extra) {
   const t = T[name] || T.body;
+  const size = Math.max(MIN_TEXT, ui.s(t.size));
   return Object.assign(
-    { fontSize: ui.s(t.size), fontWeight: t.weight, lineHeight: ui.s(t.line) },
+    { fontSize: size, fontWeight: t.weight, lineHeight: Math.max(ui.s(t.line), Math.round(size * t.line / t.size)) },
     extra || {}
   );
 }

@@ -560,7 +560,7 @@ export default function Chat({ token, target, onBack }) {
                   >
                     <Text
                       maxFontSizeMultiplier={1}
-                      style={{ fontSize: ui.s(11), fontWeight: '700', color: C.ink3 }}
+                      style={{ fontSize: ui.t(11), fontWeight: '700', color: C.ink3 }}
                     >
                       {m._day}
                     </Text>
@@ -661,7 +661,7 @@ export default function Chat({ token, target, onBack }) {
                   <View style={[s.foot, { gap: ui.s(4), marginTop: ui.s(3) }]}>
                     <Text
                       maxFontSizeMultiplier={1}
-                      style={{ fontSize: ui.s(10.5), color: mine ? '#9FB2CE' : C.ink3 }}
+                      style={{ fontSize: ui.t(10.5), color: mine ? '#9FB2CE' : C.ink3 }}
                     >
                       {clockOf(m.at)}
                     </Text>

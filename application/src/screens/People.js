@@ -160,6 +160,8 @@ export default function People({ token, me, onOpen, onSignOut }) {
     : (isDesk && seesAll && agentAt) ? agentName
     : (isDesk ? 'Conversations' : 'Our team');
   const canGoBack = isDesk && seesAll && !!agentAt;
+  // a phone (not a tablet): the waiting pill goes under the title - see the bar below
+  const narrowTop = ui.width < 480;
 
   return (
     <View style={page}>
@@ -201,18 +203,35 @@ export default function People({ token, me, onOpen, onSignOut }) {
           >
             {title}
           </Text>
-          <Text
-            maxFontSizeMultiplier={ui.maxFont}
-            numberOfLines={1}
-            style={[type('sub', ui), { color: '#B9C6DC', marginTop: ui.s(2) }]}
-          >
-            {onAgentsScreen ? 'Every conversation, by who is holding it'
-              : canGoBack ? 'Their conversations'
-              : myName + (me.is_staff && me.role_name ? ' · ' + me.role_name : '')}
-          </Text>
+          {/* On a phone the "N waiting" pill sits on this line, under the title.
+              Beside the two buttons it left "Conversations" 49-103pt on a
+              320-390pt phone, and the title read "Co..." (2 October 2026). */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: ui.s(2) }}>
+            {narrowTop && waitingAll > 0 ? (
+              <View
+                style={[
+                  s.topCount,
+                  { paddingHorizontal: ui.s(7), height: ui.s(18), borderRadius: ui.s(9), marginRight: ui.s(7) },
+                ]}
+              >
+                <Text maxFontSizeMultiplier={1} style={{ color: '#fff', fontSize: ui.t(11), fontWeight: '800' }}>
+                  {waitingAll > 99 ? '99+' : waitingAll} waiting
+                </Text>
+              </View>
+            ) : null}
+            <Text
+              maxFontSizeMultiplier={ui.maxFont}
+              numberOfLines={1}
+              style={[type('sub', ui), { color: '#B9C6DC', flexShrink: 1 }]}
+            >
+              {onAgentsScreen ? 'Every conversation, by who is holding it'
+                : canGoBack ? 'Their conversations'
+                : myName + (me.is_staff && me.role_name ? ' · ' + me.role_name : '')}
+            </Text>
+          </View>
         </View>
 
-        {waitingAll > 0 ? (
+        {!narrowTop && waitingAll > 0 ? (
           <View
             style={[
               s.topCount,
@@ -373,7 +392,7 @@ export default function People({ token, me, onOpen, onSignOut }) {
                       <View style={[s.tag, { paddingHorizontal: ui.s(6), borderRadius: ui.s(5) }]}>
                         <Text
                           maxFontSizeMultiplier={1}
-                          style={{ fontSize: ui.s(9.5), fontWeight: '800', color: C.navy, letterSpacing: 0.6 }}
+                          style={{ fontSize: ui.t(9.5), fontWeight: '800', color: C.navy, letterSpacing: 0.6 }}
                         >
                           GROUP
                         </Text>
