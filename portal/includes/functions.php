@@ -83,6 +83,10 @@ function permissionCatalogue() {
             'roles.delete'       => 'Remove a role',
             'roles.permissions'  => 'Change what a role is allowed to do',
         ),
+        // spec 010: the address, username and password each feed signs in with
+        'Data sources' => array(
+            'sources.manage'     => 'See and change the IDs the auction and statistics are fetched with',
+        ),
     );
 }
 

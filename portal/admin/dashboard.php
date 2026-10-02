@@ -623,6 +623,9 @@ require_once '_header.php';
               'role.rename'      => 'Role renamed',
               'role.delete'      => 'Role removed',
               'role.permissions' => 'Permissions changed',
+              'source.id'        => 'Data source ID changed',
+              'source.session'   => 'Feed A signed in again',
+              'source.reveal'    => 'Data source password viewed',
           );
           $rows = array();
           foreach ($staff_kinds as $k) { $rows[] = array($names[$k[0]] ?? $k[0], $k[1]); }

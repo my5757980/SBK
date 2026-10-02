@@ -51,11 +51,17 @@
  */
 
 require_once __DIR__ . '/includes/config.php';
+// The address requests go to, as saved on the admin panel's Data sources page (spec 010).
+require_once __DIR__ . '/includes/source-ids.php';
 
 /* The token lives in the server's .env, never here (21 September 2026). The cron
    runs this from the command line and needs no token at all; this door is the
    HTTP one. Empty refuses everything - hash_equals('', '') is true. */
 define('PB_TOKEN', env_get('PB_TOKEN', ''));
+/* PB_BASE is what a row we wrote is KNOWN by (cars.source_url, and every
+   `LIKE 'https://pacificboeki.jp%'` that tells our rows from others) - it never
+   changes. Requests go to pbApiBase(): the same unless the desk has saved the
+   site's new address on the Data sources page. */
 const PB_BASE    = 'https://pacificboeki.jp';
 /* Outside the web root: the session is a member's login and the state names
    what we read. Nothing here should ever be one URL away. */
@@ -181,6 +187,15 @@ function pbCookie() {
     return is_file(PB_SESSION) ? trim((string) file_get_contents(PB_SESSION)) : '';
 }
 
+/** Where requests go - the saved address, or PB_BASE (spec 010). */
+function pbApiBase() {
+    static $b = null;
+    if ($b === null) {
+        $b = rtrim(sourceIdBase('a'), '/');
+    }
+    return $b;
+}
+
 /** Keep whatever session the site hands back - it renews itself on answers. */
 function pbKeepCookie($head) {
     if (!preg_match('/^set-cookie:\s*session_id=([^;\s]+)/im', $head, $m)) {
@@ -212,7 +227,7 @@ function pbCall($path, $params, array &$s) {
     if ($cookie === '') {
         return array(null, 'HALT login: no session - sign in and run pbsession.py');
     }
-    $ch = curl_init(PB_BASE . $path);
+    $ch = curl_init(pbApiBase() . $path);
     curl_setopt_array($ch, array(
         CURLOPT_RETURNTRANSFER => 1, CURLOPT_HEADER => 1, CURLOPT_POST => 1,
         CURLOPT_TIMEOUT => 45, CURLOPT_CONNECTTIMEOUT => 12, CURLOPT_ENCODING => '',
@@ -220,7 +235,7 @@ function pbCall($path, $params, array &$s) {
                                                 'params' => $params, 'id' => mt_rand())),
         CURLOPT_HTTPHEADER => array(
             'Content-Type: application/json', 'Accept: application/json, text/plain, */*',
-            'Origin: ' . PB_BASE, 'Referer: ' . PB_BASE . '/pb-auction/', 'Cookie: ' . $cookie),
+            'Origin: ' . pbApiBase(), 'Referer: ' . pbApiBase() . '/pb-auction/', 'Cookie: ' . $cookie),
         CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                            . '(KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36',
     ));
@@ -830,6 +845,21 @@ function purgeDead($conn, $limit = 5000, $seconds = 8.0) {
 
 global $conn;
 $s = stateLoad();
+
+/* A session handed over on the admin panel while a run held the lock waits in
+   session.pending (spec 010). The next run takes it before anything else - and a
+   person having signed in again ends whatever stop the old session was in. */
+if (!$dry && is_file(PB_DIR . '/session.pending')) {
+    if (trim((string) @file_get_contents(PB_DIR . '/session.pending')) !== ''
+        && @rename(PB_DIR . '/session.pending', PB_SESSION)) {
+        @chmod(PB_SESSION, 0600);
+        $s['halted'] = '';
+        $s['haltedAt'] = '';
+        $s['sessionAt'] = 0;
+        stateSave($s);
+        pbLog('new session from the admin panel - taken');
+    }
+}
 
 if (isset($opts['reset'])) {
     $s['halted'] = '';
