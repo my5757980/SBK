@@ -3115,3 +3115,15 @@ img{max-width:100%}
   .car-body > a { display: block; padding-block: 5px; }
   .car-body { padding-block: 8px 10px; }
 }
+
+/* 2 October 2026, on the owner's yes - two small things from the responsive
+   sweep, CSS only (no auction markup or script touched):
+   - a model in a maker's list is a link a thumb has to find; on a phone it was
+     27px tall, one short of the 28 everything else here is held to;
+   - a lot with no inspection sheet shows its photograph alone (.is-solo, held to
+     820px - see "when the source sent no sheet" above). It sat at the left with
+     the right half of a laptop screen empty; it is centred now. */
+@media (max-width: 480px) {
+  .model-link { padding: 4px 0; }
+}
+.pb-body.is-solo { margin-left: auto; margin-right: auto; }
