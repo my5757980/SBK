@@ -20,6 +20,8 @@
 
 require_once dirname(__DIR__) . '/includes/config.php';
 require_once dirname(__DIR__) . '/includes/functions.php';
+// the site's address as saved on the Data sources page (spec 010)
+require_once dirname(__DIR__) . '/includes/source-ids.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Cache-Control: no-store');
@@ -82,14 +84,15 @@ if ($wait > 0) {
     usleep((int) ($wait * 1000000));
 }
 
-$ch = curl_init('https://pacificboeki.jp/api/v1/auction/lot/images');
+$base = rtrim(sourceIdBase('a'), '/');
+$ch = curl_init($base . '/api/v1/auction/lot/images');
 curl_setopt_array($ch, array(
     CURLOPT_RETURNTRANSFER => 1, CURLOPT_HEADER => 1, CURLOPT_POST => 1,
     CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_ENCODING => '',
     CURLOPT_POSTFIELDS => json_encode(array('jsonrpc' => '2.0', 'method' => 'call',
                                             'params' => array('lot_id' => pbLotId($car)), 'id' => mt_rand())),
     CURLOPT_HTTPHEADER => array('Content-Type: application/json', 'Accept: application/json, text/plain, */*',
-                                'Origin: https://pacificboeki.jp', 'Referer: https://pacificboeki.jp/pb-auction/',
+                                'Origin: ' . $base, 'Referer: ' . $base . '/pb-auction/',
                                 'Cookie: ' . $cookie),
     CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
                        . '(KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36',

@@ -91,3 +91,49 @@
   /* ...and so is each of the client's other enquiries, listed under one (20px). */
   .enq-others a{padding-block:6px}
 }
+
+/* ==== Data sources (admin/sources.php, spec 010) ============================
+   Two cards, one per feed: its status, the ID it signs in with, and for feed A
+   the four steps a person takes to hand a sign-in over. One column until the
+   page is wide enough for two cards that still read as forms. */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+.src-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:18px;align-items:start}
+@media (min-width:1360px){ .src-cards{grid-template-columns:repeat(2,minmax(0,1fr))} }
+.src-card{margin-bottom:0}
+.src-card .admin-card-head{flex-wrap:wrap;row-gap:8px}
+.src-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0}
+.src-title h2{margin:0}
+.src-sub{font-size:13px;color:var(--tx-3)}
+.src-card .src-sig{margin:0}
+.src-status{margin:0 0 6px;font-size:14px;color:var(--tx);line-height:1.5}
+.src-meta{margin:0 0 12px;font-size:12.5px;color:var(--tx-3);line-height:1.5}
+.src-note{margin:14px 0 4px;padding:11px 14px;border-radius:var(--radius-sm,8px);
+  background:#fff8e6;border:1px solid #f1dfae;font-size:13.5px;line-height:1.55;color:#5b4a1a}
+.src-note-ok{background:var(--ok-soft,#e7f6ec);border-color:#bfe3cf;color:#1f4d33}
+.src-h{margin:22px 0 10px;font-size:14px;font-weight:750;color:var(--tx);
+  display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.src-when{font-size:12px;font-weight:500;color:var(--tx-3)}
+.src-form .form-grid{gap:14px 16px}
+.src-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.src-inline .input{flex:1 1 220px;min-width:0}
+.src-pass-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px}
+.src-revealed{font-family:var(--mono,monospace);font-size:13px;background:#f3f4f6;border:1px solid var(--line);
+  border-radius:6px;padding:4px 8px;overflow-wrap:anywhere}
+.src-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:14px}
+.src-steps{margin:0;padding:0;list-style:none;counter-reset:srcstep}
+.src-steps > li{position:relative;counter-increment:srcstep;padding:2px 0 16px 40px;font-size:14px;line-height:1.55;color:var(--tx)}
+.src-steps > li::before{content:counter(srcstep);position:absolute;left:0;top:0;width:27px;height:27px;border-radius:50%;
+  background:var(--ink,#151a21);color:#fff;font-size:13px;font-weight:750;display:flex;align-items:center;justify-content:center}
+.src-steps > li:not(:last-child)::after{content:"";position:absolute;left:13px;top:31px;bottom:4px;width:1px;background:var(--line)}
+.src-step-do{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.src-howto{margin-top:8px;font-size:13px;color:var(--tx-2)}
+.src-howto summary{cursor:pointer;color:var(--accent);font-weight:650;display:inline-block;padding:3px 0}
+.src-howto ol{margin:8px 0 0;padding-left:20px;line-height:1.7}
+.src-connect{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.src-connect .input{flex:1 1 260px;min-width:0;font-family:var(--mono,monospace);font-size:13px}
+kbd{font-family:var(--mono,monospace);font-size:12px;background:#f3f4f6;border:1px solid #d6d9de;border-bottom-width:2px;
+  border-radius:4px;padding:1px 5px;color:#2c3440}
+@media (max-width:480px){
+  .src-steps > li{padding-left:36px}
+  .src-actions .btn-primary, .src-connect .btn-primary{flex:1 1 100%}
+}

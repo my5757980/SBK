@@ -36,6 +36,7 @@ function navIcon($k) {
         'staff'       => '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2.2"/><path d="M5.5 16.5c.6-1.6 1.9-2.4 3.5-2.4s2.9.8 3.5 2.4M15 10h4M15 14h3"/>',
         'roles'       => '<path d="M12 3l7 3v5.5c0 4.2-2.9 7.7-7 9.5-4.1-1.8-7-5.3-7-9.5V6z"/>',
         'permissions' => '<circle cx="8" cy="12" r="3.5"/><path d="M11.5 12H21M18 12v3.5M15 12v2.5"/>',
+        'sources'     => '<ellipse cx="12" cy="6" rx="7" ry="2.6"/><path d="M5 6v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6V6"/><path d="M5 12v6c0 1.4 3.1 2.6 7 2.6s7-1.2 7-2.6v-6"/>',
         'logout'      => '<path d="M14 4h4a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-4"/><path d="M9 8l-4 4 4 4M5 12h10"/>',
     );
     if (!isset($p[$k])) { return ''; }
@@ -71,6 +72,8 @@ $nav_groups = array(
         )),
         'roles'       => array('Roles',       'roles.php',       'roles.view'),
         'permissions' => array('Permissions', 'permissions.php', 'roles.view'),
+        // the IDs the feeds sign in with (spec 010)
+        'sources'     => array('Data sources', 'sources.php',    'sources.manage'),
     ),
 );
 

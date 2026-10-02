@@ -40,6 +40,34 @@ if (AAA_INGEST_TOKEN === '' || !hash_equals(AAA_INGEST_TOKEN, (string) ($_GET['t
     exit;
 }
 
+/* ------------------------------------------------------- "which ID?" (spec 010)
+ * The ID the desk saved on the admin panel's Data sources page, asked for by the
+ * job at the start of every run. rev 0 = nothing saved: the job keeps the
+ * username and password set as its GitHub secrets. Only this token's holder
+ * gets an answer, over HTTPS; the job never prints what it receives.
+ *
+ *   GET ?t=TOKEN&id=1   -> {"ok":true,"rev":3,"base":"https://…","user":"…","pass":"…"} | {"ok":true,"rev":0}
+ */
+if (isset($_GET['id'])) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    require_once __DIR__ . '/includes/source-ids.php';
+    try {
+        $b = sourceIdGet('b');
+        if ($b['rev'] > 0 && $b['user'] !== '' && $b['has_pass']) {
+            echo json_encode(array('ok' => true, 'rev' => $b['rev'], 'base' => $b['base'],
+                                   'user' => $b['user'], 'pass' => sourceIdPass('b')));
+        } else {
+            echo json_encode(array('ok' => true, 'rev' => 0));
+        }
+    } catch (Throwable $e) {
+        // Unreadable now: the job must not fall back to an old ID - see aaa_fetch.py portal_id().
+        http_response_code(503);
+        echo json_encode(array('ok' => false, 'error' => 'the saved ID could not be read'));
+    }
+    exit;
+}
+
 /* ------------------------------------------------------- "how is the ID?"
  * The fetcher says, at the end of EVERY run, how its sign-in to aaajapan went -
  * whether it got in, was refused, was turned away at the door, or has stopped
@@ -69,6 +97,8 @@ if (isset($_GET['health'])) {
         'pages'     => (int) ($in['pages'] ?? 0),
         'new'       => (int) ($in['new'] ?? 0),
         'run'       => substr((string) ($in['run'] ?? ''), 0, 40),
+        // which saved ID (spec 010) the run used - 0 = the GitHub secrets
+        'id_rev'    => (int) ($in['id_rev'] ?? 0),
     );
     /* The same job reads aaajapan's live auction too (spec 009); its pass reports when
        it last ended clean, so the auction's signal can name this feed when it stops. */
