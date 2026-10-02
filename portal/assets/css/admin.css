@@ -52,6 +52,21 @@
   .viz-wave .viz-tick{font-size:22px}
 }
 
+/* ---- big monitors -----------------------------------------------------------
+   At 2560px the desk's menu runs down the left edge of the window, but the bar
+   above it kept the site's centred 1,360px column: the logo floated 600px to
+   the right of the menu it heads. The bar and the foot now span the window as
+   the desk under them does. And the work itself is held to 1,640px, centred in
+   the room right of the menu - a table 2,300px wide put a car's name and its
+   price a hand's width apart. Below about 1,920px nothing here changes - and
+   it is held inside min-width, so a phone keeps style.css's own 12-16px. */
+@media (min-width:1400px){
+  .admin-body .topbar > .container,
+  .admin-body .footer > .container{max-width:none}
+  .admin-main{padding-left:max(30px, calc((100% - 1640px) / 2));
+    padding-right:max(30px, calc((100% - 1640px) / 2))}
+}
+
 /* ---- the menu strip --------------------------------------------------------
    Up to 900px the menu is a strip across the top, and an OPEN entry - Staff, on
    its own pages - stood its two links underneath itself: the strip grew into a
