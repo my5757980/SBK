@@ -15,4 +15,4 @@ RedirectMatch 302 ^/app/?$ /
 # 30.9 MB. A cut download leaves a half-written file, and Android reports that as
 # "there was a problem parsing the package" - which is exactly what customers saw.
 # The release is public and holds the APK alone; no code is published with it.
-RedirectMatch 302 ^/SBK-Chat\.apk$ https://github.com/MohsinRaza2000/SBK-APK/releases/download/v1.0.9/SBK-Chat.apk
+RedirectMatch 302 ^/SBK-Chat\.apk$ https://github.com/MohsinRaza2000/SBK-APK/releases/download/v1.0.10/SBK-Chat.apk

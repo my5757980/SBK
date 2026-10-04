@@ -2,7 +2,7 @@
   "expo": {
     "name": "SBK Chat",
     "slug": "sbk-chat",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -24,7 +24,7 @@
     },
     "android": {
       "package": "com.sbkautotrading.chat",
-      "versionCode": 9,
+      "versionCode": 11,
       "adaptiveIcon": {
         "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
