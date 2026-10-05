@@ -35,8 +35,11 @@ const AAA_LOCK   = __DIR__ . '/aaa-stats.lock';
 const AAA_COOKIE = __DIR__ . '/aaa-stats.cookie';
 
 const AAA_BASE   = 'https://bid.aaajapan.com';
-const AAA_USER   = env_get('AAA_USER', '');
-const AAA_PASS   = env_get('AAA_PASS', '');
+/* The source login is not written here any more (5 October 2026). Like the
+   token, it comes from the server's .env (AAA_USER / AAA_PASS). It used to sit
+   in a public repository, so the password should be changed at the source. */
+define('AAA_USER', env_get('AAA_USER', ''));
+define('AAA_PASS', env_get('AAA_PASS', ''));
 
 /** Seconds between requests. The owner's rule, and it is not negotiable
  *  without him: a previous supplier blocked this server's address when the
@@ -485,6 +488,11 @@ $wrote  = 0;
 $fields = array();
 $makers = (array) $s['makers'];
 
+if (AAA_USER === '' || AAA_PASS === '') {
+    stSave($s);
+    echo "AAA_USER / AAA_PASS server ki .env mein nahi - login ke baghair ruk gaya\n";
+    exit;
+}
 list($ok, $fields, $found, $err) = aaaSignIn($s['used']);
 $did += 3;
 if (!$ok) {

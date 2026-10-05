@@ -3,7 +3,7 @@
  * Statistics ingest - the receiving half of the aaajapan statistics feed.
  *
  * WHY THIS EXISTS. aaajapan (bid.aaajapan.com) blocks this hosting server's IP
- * outright (403 "Your IP address: 66.29.146.11"), so the harvester that lives
+ * outright (a 403 that names the server's own address), so the harvester that lives
  * here - aaa-stats-harvest.php - cannot reach it. A machine that is NOT blocked
  * (the owner's PC, or a small always-on cloud box) does the fetching instead and
  * POSTs the rows here; this file writes them into `car_stats` and touches
