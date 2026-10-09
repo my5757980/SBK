@@ -120,6 +120,11 @@ function assetV($path) {
 
       <?php if (!empty($error)): ?>
         <div class="alert alert-error"><?php echo sanitize($error); ?></div>
+      <?php elseif (($_GET['sso'] ?? '') === 'nouser'): ?>
+        <?php /* From the website's "Auction" button (../sso.php): no staff account here has that email. */ ?>
+        <div class="alert alert-error">Your website email has no staff account here yet. Sign in with your auction username and password, or ask an administrator to put your website email on your auction account.</div>
+      <?php elseif (($_GET['sso'] ?? '') === 'invalid'): ?>
+        <div class="alert alert-error">That sign-in link has expired or was already used. Go back to the website and press Auction again.</div>
       <?php endif; ?>
 
       <form method="POST">
