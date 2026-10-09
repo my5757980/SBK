@@ -16,6 +16,7 @@
  *   POST ?t=TOKEN&rows=1      {hall, makers:[...], rows:[{a,b,c,...}]} -> {new, updated, pb, past, results...}
  *   POST ?t=TOKEN&done=1      {hall, count, since}   whole, stable read -> retire ours it did not see
  *   GET  ?t=TOKEN&dedupe=1    a lot PB now lists too: our row merged into PB's (references moved)
+ *   php aaa-auction-ingest.php --dedupe   the same fold from the server's own cron, every 10 min
  *
  * OUR ROWS: car_id `aj-<day>-<hall>-<lot>`, source_section 'japan' (so every page shows them
  * as it shows PB's), images = the source's three pictures (two photographs and the inspection
@@ -31,8 +32,18 @@ require_once __DIR__ . '/includes/source-health.php';       // sourceDataDir()
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
 
+/* The fold, from the server's own cron (the owner's yes, 9 Oct 2026). The fetcher folds our lots PB
+   now lists at the end of every pass - but its passes stop for the day once its share of requests is
+   spent (07:40 UTC that day), and from then on every lot PB added showed twice: 382 by 09:45 UTC.
+   Folding asks the source nothing, so it no longer waits for the share. Command line only: a web
+   request is never PHP_SAPI 'cli', so the door below still wants the token. */
+$cliDedupe = PHP_SAPI === 'cli' && in_array('--dedupe', (array) ($_SERVER['argv'] ?? array()), true);
+if ($cliDedupe) {
+    $_GET = array('dedupe' => '1');
+}
+
 define('AAA_INGEST_TOKEN', env_get('AAA_INGEST_TOKEN', ''));
-if (AAA_INGEST_TOKEN === '' || !hash_equals(AAA_INGEST_TOKEN, (string) ($_GET['t'] ?? ''))) {
+if (!$cliDedupe && (AAA_INGEST_TOKEN === '' || !hash_equals(AAA_INGEST_TOKEN, (string) ($_GET['t'] ?? '')))) {
     http_response_code(404);
     exit;
 }
@@ -514,6 +525,13 @@ if (isset($_GET['dedupe'])) {
                     $merged += aucMerge($conn, $a['car_id'], $same['car_id']);
                 }
             }
+        }
+    }
+    if ($cliDedupe) {
+        // the cron's own trace: when it last ran (one small file, rewritten), and a line only when it folded
+        @file_put_contents(aucDir() . '/dedupe-last.json', json_encode(array('at' => time(), 'merged' => $merged)), LOCK_EX);
+        if ($merged > 0) {
+            @file_put_contents(aucDir() . '/dedupe.log', gmdate('Y-m-d H:i') . " UTC folded $merged\n", FILE_APPEND | LOCK_EX);
         }
     }
     aucOut(isset($_GET['dry']) ? array('would' => $merged, 'samples' => $would) : array('merged' => $merged));

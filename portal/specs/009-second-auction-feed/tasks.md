@@ -20,3 +20,10 @@
       auction signal naming the feed at fault; source-signal.js repaints the label.
       Test: t_auction 30/30, t_sim2 70/70; signalcheck (rules 50/50 before deploy, pages after);
       namescan allows only a red auction signal.
+- [x] T7 (9 Oct 2026, the owner's yes) The fold no longer waits for the fetcher: `php aaa-auction-ingest.php
+      --dedupe` from the server's cron at minutes 4,14,...,54 (command line only - a web request is never
+      PHP_SAPI cli, so the web door still wants the token; no source request). Why: passes stop once the
+      day's share is spent (07:40 UTC on 9 Oct) and 382 B lots then showed twice beside PB's until the
+      next day. Trace: aaa-fetch/dedupe-last.json (each run) and dedupe.log (a line when it folded).
+      Test: 4 token-less web calls 404; token dry run still answers; first cron run 10:14:25 UTC wrote
+      its trace (merged 0 - the 382 had been folded by hand at 09:52 UTC: dry 382 -> 382 -> dry 0).
