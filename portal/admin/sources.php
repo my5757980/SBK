@@ -132,7 +132,7 @@ $notesA = sourceIdNotes('a');
 
 /* Feed A: the harvester's own state, in our words. */
 $hA = sourceHealthAuction();
-$pendingA = is_file(sourceHome() . '/pb-harvest/session.pending');
+$pendingA = is_file(sourceDataDir('pb-harvest') . '/session.pending');
 if ($pendingA) {
     $sigA = array('cls' => 'is-wait', 'text' => 'Taking the new sign-in',
                   'detail' => 'A new sign-in is waiting; the next run takes it, within 5 minutes.');
@@ -148,7 +148,7 @@ if ($pendingA) {
 /* Feed B: the job's last report, and whether it has taken the saved ID yet. */
 $hS = sourceHealthStatistics();
 $hB = sourceHealthAuctionB();
-$health = json_decode((string) @file_get_contents(sourceHome() . '/aaa-fetch/health.json'), true) ?: array();
+$health = json_decode((string) @file_get_contents(sourceDataDir('aaa-fetch') . '/health.json'), true) ?: array();
 $usedRev = (int) ($health['id_rev'] ?? 0);
 $waitingB = $idB['rev'] > 0 && $usedRev < $idB['rev'];
 if ($waitingB) {

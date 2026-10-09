@@ -36,10 +36,10 @@ $line = '[' . gmdate('Y-m-d H:i:s') . ' UTC] ua=' . $ua . "\n" . $body . "\n----
 // error_log() was tried first and never landed anywhere findable - its ini
 // value here is the RELATIVE path "error_log", which PHP resolves against
 // whatever the process's working directory happens to be, and that turned
-// out not to be this script's own folder either. A fixed, absolute path next
-// to MEDIA_DIR (outside the web root, same as the pictures) is the one this
-// account is proven to write to reliably.
-$log = dirname(MEDIA_DIR) . '/app-crash.log';
+// out not to be this script's own folder either. A fixed, absolute path
+// outside the web root, like the pictures, is the one this account is proven
+// to write to reliably: ~/sbk-data/app/app-crash.log since 9 Oct 2026 (spec 011).
+$log = APP_CRASH_LOG;
 $fh = @fopen($log, 'a');
 if ($fh) {
     flock($fh, LOCK_EX);

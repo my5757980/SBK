@@ -81,7 +81,7 @@ if ($ext === null) {
     /* Say WHICH type was refused, in the same place the phone's own reports go.
        A refusal that does not name the type is a day of guessing - which is
        what it cost on 18 September 2026. */
-    @file_put_contents('/home/thelyfas/app-crash.log',
+    @file_put_contents(APP_CRASH_LOG,
         '[' . gmdate('Y-m-d H:i:s') . ' UTC] upload refused: kind=' . $kind
         . ' mime=' . $mime . ' bytes=' . (int) $f['size'] . PHP_EOL . '----' . PHP_EOL,
         FILE_APPEND | LOCK_EX);

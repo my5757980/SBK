@@ -145,10 +145,20 @@ define('SITE_ORIGINS', 'https://sbkautotrading.com,https://www.sbkautotrading.co
    between a customer and the desk is not public, and a folder under the web
    root is public whatever anybody intends. Nothing can be reached by guessing a
    path; media.php is the only door, and it asks who is knocking.
-   The fallback is only for a machine that has no such folder - a laptop. */
-define('MEDIA_DIR', is_dir('/home/thelyfas')
-    ? '/home/thelyfas/chat-media'
-    : dirname(__DIR__) . '/storage');
+   The fallback is only for a machine that has no such folder - a laptop.
+   Since 9 October 2026 our private folders live together in ~/sbk-data/ (spec
+   011, the client asked for them in one place): the chat's under chat/, the
+   app's under app/. Each is used there once it has been moved, and where it was
+   until then - so this went live first and nothing stopped during the move. */
+define('SBK_DATA', '/home/thelyfas/sbk-data');
+define('MEDIA_DIR', is_dir(SBK_DATA . '/chat/chat-media')
+    ? SBK_DATA . '/chat/chat-media'
+    : (is_dir('/home/thelyfas') ? '/home/thelyfas/chat-media' : dirname(__DIR__) . '/storage'));
+
+/* The phone app's crash reports, and the uploads refused with the type named. */
+define('APP_CRASH_LOG', is_dir(SBK_DATA . '/app')
+    ? SBK_DATA . '/app/app-crash.log'
+    : dirname(MEDIA_DIR) . '/app-crash.log');
 
 /* How long since the last heartbeat still counts as "online".
    The beat is every 15 seconds, so 45 forgives two missed ones - a lost beat on

@@ -25,9 +25,10 @@
  * (register_shutdown_function, then litespeed_finish_request), so a message is
  * never kept waiting on Google, and a Google outage can never stop a message.
  *
- * THE KEY lives outside every web root, in /home/thelyfas/sbk-private/, and is
- * never printed anywhere. The hour-long access token made from it is kept in
- * the same folder, so Google is asked for one at most once an hour.
+ * THE KEY lives outside every web root, in ~/sbk-data/app/push/ since 9 October
+ * 2026 (spec 011; ~/sbk-private/ before the move), and is never printed
+ * anywhere. The hour-long access token made from it is kept in the same
+ * folder, so Google is asked for one at most once an hour.
  *
  * The phone side is sbk-app/src/push.js; the payload keys (title, message,
  * subtitle, channelId, categoryId, tag, body) are the ones expo-notifications
@@ -36,7 +37,7 @@
  * itself current, and a missed call replaces the ringing one.
  */
 
-define('PUSH_DIR',      '/home/thelyfas/sbk-private');
+define('PUSH_DIR',      is_dir('/home/thelyfas/sbk-data/app/push') ? '/home/thelyfas/sbk-data/app/push' : '/home/thelyfas/sbk-private');
 define('PUSH_KEY_FILE', PUSH_DIR . '/fcm-service-account.json');
 define('PUSH_CACHE',    PUSH_DIR . '/fcm-access-token.json');
 define('PUSH_LOG',      PUSH_DIR . '/push.log');

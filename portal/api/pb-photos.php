@@ -28,7 +28,7 @@ header('Cache-Control: no-store');
 
 const PB_GAP = 2.0;
 const PB_HOURLY = 300;
-define('PB_HOME', dirname(__DIR__, 2) . '/pb-harvest');
+define('PB_HOME', sourceDataDir('pb-harvest'));      // ~/sbk-data/auction/pb-harvest (spec 011)
 
 function pbOut(array $a, $code = 200) {
     http_response_code($code);

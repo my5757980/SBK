@@ -13,8 +13,9 @@
  * arrives for a broken one. What is written is capped and never trusted —
  * this is a stack trace from a phone, not a command.
  *
- * It is read from /home/thelyfas/app-crash.log, which sits outside every
- * website's folder, so nothing here is reachable from the web.
+ * It is read from ~/sbk-data/app/app-crash.log (spec 011, 9 Oct 2026 - before
+ * the move ~/app-crash.log), which sits outside every website's folder, so
+ * nothing here is reachable from the web.
  */
 
 if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') {
@@ -34,7 +35,7 @@ if ($body === '') {
 $ua = substr((string) ($_SERVER['HTTP_USER_AGENT'] ?? '-'), 0, 120);
 $line = '[' . gmdate('Y-m-d H:i:s') . ' UTC] ua=' . $ua . "\n" . $body . "\n----\n";
 
-$log = '/home/thelyfas/app-crash.log';
+$log = is_dir('/home/thelyfas/sbk-data/app') ? '/home/thelyfas/sbk-data/app/app-crash.log' : '/home/thelyfas/app-crash.log';
 $fh = @fopen($log, 'a');
 if ($fh) {
     flock($fh, LOCK_EX);

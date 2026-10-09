@@ -26,6 +26,7 @@
  */
 
 require_once __DIR__ . '/includes/config.php';
+require_once __DIR__ . '/includes/source-health.php';       // sourceDataDir()
 
 header('Content-Type: application/json; charset=utf-8');
 header('X-Content-Type-Options: nosniff');
@@ -35,6 +36,9 @@ if (AAA_INGEST_TOKEN === '' || !hash_equals(AAA_INGEST_TOKEN, (string) ($_GET['t
     http_response_code(404);
     exit;
 }
+
+/** The feed's notes: ~/sbk-data/auction/aaa-fetch since 9 Oct 2026 (spec 011), ~/aaa-fetch before. */
+function aucDir() { return sourceDataDir('aaa-fetch'); }
 
 const AUC_SRC  = 'https://bid.aaajapan.com/aj_neo?h=';      // + rawurlencode(hall) + '#' + the source's row id
 const AUC_IMG  = 'https://8.ajes.com/imgs/';
@@ -49,7 +53,7 @@ const AUC_CAP  = 30;                                        // retire at most th
 function aucLock() {
     static $h = null;
     if ($h === null) {
-        $d = dirname(__DIR__) . '/aaa-fetch';
+        $d = aucDir();
         if (!is_dir($d)) { @mkdir($d, 0750, true); }
         $h = @fopen($d . '/auction-halls.lock', 'c');
         if ($h) { flock($h, LOCK_EX); }
@@ -58,7 +62,7 @@ function aucLock() {
 /** The hall state. A file that is there but unreadable is NEVER taken for an empty state - that is
     how it was wiped; the request is refused instead (the pass notes a fault and tries next time). */
 function aucState() {
-    $f = dirname(__DIR__) . '/aaa-fetch/auction-halls.json';
+    $f = aucDir() . '/auction-halls.json';
     $empty = array('halls' => array(), 'votes' => array(), 'survey' => array());
     for ($i = 0; $i < 3; $i++) {
         clearstatcache(true, $f);
@@ -79,7 +83,7 @@ function aucState() {
  * otherwise the old state stays and the failure is logged.
  */
 function aucSave(array $s) {
-    $d = dirname(__DIR__) . '/aaa-fetch';
+    $d = aucDir();
     if (!is_dir($d)) { @mkdir($d, 0750, true); }
     $f = $d . '/auction-halls.json';
     $tmp = $f . '.' . getmypid() . '.tmp';
@@ -332,7 +336,7 @@ function aucDateOf($dom, $today) {
 /** Per hall, the last page whose lots were passed over and why, with samples - never silent again.
     Written under the request's lock, a whole copy only; the 80 most recent halls. */
 function aucKeepSkips($hall, array $out, array $skip) {
-    $f = dirname(__DIR__) . '/aaa-fetch/auction-skips.json';
+    $f = aucDir() . '/auction-skips.json';
     $all = json_decode((string) @file_get_contents($f), true);
     if (!is_array($all)) { $all = array(); }
     $all[$hall] = array('at' => time(), 'counts' => array_intersect_key($out, array_flip(array('new', 'pb', 'past', 'result_skip', 'bad'))),
@@ -351,7 +355,7 @@ function aucKeepSkips($hall, array $out, array $skip) {
 /** The last survey as the source gave it - every hall's count under each weekday - kept for the
     owner's questions ("of aaajapan's lots on sale, how many are not on PB?"). A whole copy only. */
 function aucKeepSurvey(array $in) {
-    $f = dirname(__DIR__) . '/aaa-fetch/auction-survey.json';
+    $f = aucDir() . '/auction-survey.json';
     $json = json_encode(array('at' => time(), 'onsale' => (int) ($in['onsale'] ?? 0), 'halls' => (array) ($in['halls'] ?? array())),
                         JSON_INVALID_UTF8_SUBSTITUTE);
     if ($json === false) { return; }

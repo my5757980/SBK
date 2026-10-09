@@ -64,8 +64,10 @@ define('PB_TOKEN', env_get('PB_TOKEN', ''));
    site's new address on the Data sources page. */
 const PB_BASE    = 'https://pacificboeki.jp';
 /* Outside the web root: the session is a member's login and the state names
-   what we read. Nothing here should ever be one URL away. */
-define('PB_DIR', dirname(__DIR__) . '/pb-harvest');
+   what we read. Nothing here should ever be one URL away. Since 9 Oct 2026
+   it is ~/sbk-data/auction/pb-harvest (spec 011); sourceDataDir() keeps to the
+   old ~/pb-harvest until the folder has been moved. */
+define('PB_DIR', sourceDataDir('pb-harvest'));
 define('PB_SESSION', PB_DIR . '/session.txt');
 define('PB_STATE', PB_DIR . '/state.json');
 define('PB_LOCK', PB_DIR . '/harvest.lock');

@@ -14,7 +14,8 @@
  *           signs in with username and password by itself, and asks the portal for
  *           the ID at the start of every run (aaa-stats-ingest.php ?id=1).
  *
- * WHERE IT LIVES. `~/source-ids/`, outside every web root: ids.json (0600) and the
+ * WHERE IT LIVES. `~/sbk-data/auction/source-ids/` (spec 011; `~/source-ids/` before the
+ * move - sourceDataDir()), outside every web root: ids.json (0600) and the
  * encryption key in a file of its own (0600). The password is AES-256-GCM
  * ciphertext in ids.json - never in a repository, a log, the GitHub job's state
  * file or a page's HTML. Written whole (tmp, length checked, rename) under a lock:
@@ -25,7 +26,7 @@
  * cars.source_url never changes; only where requests are sent does.
  */
 
-require_once __DIR__ . '/source-health.php';      // sourceHome()
+require_once __DIR__ . '/source-health.php';      // sourceHome(), sourceDataDir()
 
 const SOURCE_FEEDS = array('a', 'b');
 
@@ -40,7 +41,7 @@ function sourceIdsDir($dir = null) {
     if ($dir !== null) {
         $over = rtrim($dir, '/');
     }
-    return $over ?: sourceHome() . '/source-ids';
+    return $over ?: sourceDataDir('source-ids');
 }
 
 function sourceIdsLoadAll() {
@@ -339,7 +340,7 @@ function pbSessionCheck($base, $code) {
  * @return string 'now' or 'next-run'
  */
 function pbSessionInstall($code, $pbDir = null) {
-    $pbDir = $pbDir ?: sourceHome() . '/pb-harvest';
+    $pbDir = $pbDir ?: sourceDataDir('pb-harvest');
     $line = 'api_mode=odoo; session_id=' . $code;
     $lock = @fopen($pbDir . '/harvest.lock', 'c');
     if ($lock && flock($lock, LOCK_EX | LOCK_NB)) {

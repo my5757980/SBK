@@ -46,6 +46,20 @@ function sourceHome() {
     return dirname(__DIR__, 2);
 }
 
+/**
+ * One of the portal's private folders: 'pb-harvest', 'aaa-fetch' or 'source-ids'.
+ *
+ * They sit outside every web root - a member's session, the IDs, what we read. Until 9 October 2026
+ * they lay loose in the account's root; the client asked for our things to be in one place and the
+ * owner chose one folder, `~/sbk-data/`, with the auction's under `auction/` (spec 011). A folder not
+ * moved there yet is used where it was, so this went live before the move and nothing stopped while
+ * it was made - and code that creates a missing folder can only create the new one once it is.
+ */
+function sourceDataDir($name) {
+    $new = sourceHome() . '/sbk-data/auction/' . $name;
+    return is_dir($new) ? $new : sourceHome() . '/' . $name;
+}
+
 function sourceAgo($seconds) {
     $s = max(0, (int) $seconds);
     if ($s < 90) {
@@ -72,7 +86,7 @@ function sourceState($ok, $state, $detail, $at = 0) {
 
 /** The auction's ID: the member session pb-harvest.php reads with. */
 function sourceHealthAuction($dir = null) {
-    $dir = $dir ?: sourceHome() . '/pb-harvest';     // a test hands in a folder of its own
+    $dir = $dir ?: sourceDataDir('pb-harvest');      // a test hands in a folder of its own
     $st  = json_decode((string) @file_get_contents($dir . '/state.json'), true);
     if (!is_array($st)) {
         return sourceState(false, 'nostate',
@@ -124,7 +138,7 @@ function sourceHealthAuction($dir = null) {
 
 /** The statistics' ID: the account the job on GitHub signs in with. */
 function sourceHealthStatistics($file = null) {
-    $file = $file ?: sourceHome() . '/aaa-fetch/health.json';   // a test hands in a file of its own
+    $file = $file ?: sourceDataDir('aaa-fetch') . '/health.json';   // a test hands in a file of its own
     $h = json_decode((string) @file_get_contents($file), true);
     if (!is_array($h) || empty($h['at'])) {
         // It has reported since the day it was set up, so no report now is a fault.
@@ -203,7 +217,7 @@ function sourceHealthStatistics($file = null) {
  * pass is not red - the next usually goes through - nor is a spent allowance.
  */
 function sourceHealthAuctionB($file = null) {
-    $file = $file ?: sourceHome() . '/aaa-fetch/health.json';   // a test hands in a file of its own
+    $file = $file ?: sourceDataDir('aaa-fetch') . '/health.json';   // a test hands in a file of its own
     $id = sourceHealthStatistics($file);
     if (!$id['ok']) {
         return sourceState(false, 'account',

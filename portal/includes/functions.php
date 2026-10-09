@@ -889,7 +889,8 @@ function isUssLot($car) {
 }
 
 function ussPhotoDir() {
-    return dirname(__DIR__, 2) . '/pb-harvest/photos';
+    require_once __DIR__ . '/source-health.php';      // sourceDataDir() - ~/sbk-data/auction/pb-harvest (spec 011)
+    return sourceDataDir('pb-harvest') . '/photos';
 }
 
 /**
