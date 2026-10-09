@@ -54,6 +54,7 @@ function aucDir() { return sourceDataDir('aaa-fetch'); }
 const AUC_SRC  = 'https://bid.aaajapan.com/aj_neo?h=';      // + rawurlencode(hall) + '#' + the source's row id
 const AUC_IMG  = 'https://8.ajes.com/imgs/';
 const AUC_CAP  = 30;                                        // retire at most this + a tenth of the hall per read
+const AUC_PACE_HEAD = 6;                                    // the share's pace: (UTC hour + this) / 24 of it by then
 
 /**
  * One request at a time over the hall state, from its read to its save. On 30 Sep a test's clean-up
@@ -470,9 +471,40 @@ if (isset($_GET['survey'])) {
         }
     }
     usort($due, function ($a, $b) { return $b['p'] - $a['p']; });
+    /* The day's share, spread over the day (the owner, 9 Oct 2026: the same 8,000, "baant do" - not
+       more). On 9 Oct it was all spent by 07:40 UTC (16:40 JST, 12:40 PK) and nothing was read until
+       00:00 UTC: lots listed that evening came in the next morning, some after their sale had begun,
+       and lots withdrawn stayed on our list. Now by hour h of the UTC day (the share's own day) the
+       reads may have used at most (h + AUC_PACE_HEAD) / 24 of it - a quarter at once, all of it by
+       18:00 UTC. Ahead of that pace only results (a sold car must leave the list) and halls never read
+       (lots nobody holds) are handed out; the rest waits and is read later in the day, when the next
+       days' lists are fuller anyway. The 80% rule above stays as it was. */
+    $budget = (int) ($in['budget'] ?? 0);
+    $used   = (int) ($in['used'] ?? 0);
+    $pace   = $budget > 0 ? (int) ($budget * min(1, (($now % 86400) / 3600 + AUC_PACE_HEAD) / 24)) : 0;
+    $held   = 0;
+    if ($budget > 0 && $used >= $pace) {
+        $keep = array();
+        foreach ($due as $d) {
+            if ($d['why'] === 'results' || strncmp($d['why'], 'new', 3) === 0) { $keep[] = $d; } else { $held++; }
+        }
+        $due = $keep;
+    }
     $st['survey'] = array('at' => $now, 'onsale' => (int) ($in['onsale'] ?? 0),
                           'stat_total' => (int) ($in['stat_total'] ?? 0), 'stat_date' => (string) ($in['stat_date'] ?? ''),
-                          'halls' => count($halls), 'due' => count($due));
+                          'halls' => count($halls), 'due' => count($due),
+                          'used' => $used, 'pace' => $pace, 'held' => $held);
+    if ($budget > 0) {
+        // a line a survey (~70 a day) to measure the spread by; kept under 300 KB
+        $pl = aucDir() . '/pace.log';
+        @file_put_contents($pl, gmdate('Y-m-d H:i') . " used $used pace $pace of $budget | due " . count($due)
+                                . ($held ? " held $held" : '') . "\n", FILE_APPEND | LOCK_EX);
+        clearstatcache(true, $pl);
+        if (@filesize($pl) > 300000) {
+            $all = (string) @file_get_contents($pl);
+            @file_put_contents($pl, substr($all, (int) (strlen($all) / 2)), LOCK_EX);
+        }
+    }
     aucSave($st);
     aucOut(array('now' => $now, 'halls' => count($halls), 'due' => array_slice($due, 0, 40)));
 }

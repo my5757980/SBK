@@ -27,3 +27,9 @@
       next day. Trace: aaa-fetch/dedupe-last.json (each run) and dedupe.log (a line when it folded).
       Test: 4 token-less web calls 404; token dry run still answers; first cron run 10:14:25 UTC wrote
       its trace (merged 0 - the 382 had been folded by hand at 09:52 UTC: dry 382 -> 382 -> dry 0).
+- [x] T8 (9 Oct 2026, the owner's yes - "the same 8,000, spread it", not more) The survey's plan paces the
+      share over the UTC day: by hour h at most (h + 6) / 24 of it (2,000 at 05:00 PK, 4,000 at 11:00,
+      6,000 at 17:00, all 8,000 by 23:00). Ahead of that only results and never-read halls are handed
+      out; moved/due halls wait. On 9 Oct the whole share was gone by 12:40 PK and nothing was read
+      until 05:00 PK. Measurement: aaa-fetch/pace.log (a line a survey) + `survey.used/pace/held` in
+      the hall state. Test: auctioningestcheck 30/30 (two new: behind pace -> handed out; ahead -> waits).
