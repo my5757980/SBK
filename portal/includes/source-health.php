@@ -36,9 +36,10 @@
  * live auction, read by the same job on GitHub with the same ID as the
  * statistics. The auction keeps ONE signal over both. The owner, the same day:
  * when both are fine it says "Auction working" as before, no name; when one is
- * not, it names the one at fault - "PB Auction not working", "aaajapan Auction
- * not working" - so staff know which to look at. He chose this knowing the
- * no-names rule; that red label (its hover, its JSON) is the one exception.
+ * not, it says which one is at fault. Since 19 October 2026 (the owner: when only
+ * B is down it read as if A were too - "har jagah B not working") it says so in
+ * the letters every count on the portal already uses, and says the other is fine:
+ * "Auction B not working · A working". No source is named anywhere any more.
  */
 
 /** Where both feeds keep their notes - the account's home, outside every web root. */
@@ -263,28 +264,35 @@ function sourceHealthAuctionB($file = null) {
 
 /**
  * The auction's ONE signal over both feeds (the owner, 29 September 2026). Both
- * fine: green "Auction working", no name anywhere. One not: red, and `name` - the
- * label - says which: "PB Auction", "aaajapan Auction", "PB + aaajapan Auction".
- * `a` and `b` keep each feed's own case for the tests and whoever fixes it.
+ * fine: green "Auction working". One not: red, and `name` - the label - says
+ * which, in the portal's own letters (A = the first feed, B = the second, as in
+ * every "A 137,198 B 9,051" count), and `text` says the other one still works:
+ * "Auction B" + "not working · A working"; both down: "Auction A + B" + "not
+ * working" (the owner, 19 October 2026). `state` is 'a', 'b' or 'both'; `a` and
+ * `b` keep each feed's own case for the tests and whoever fixes it.
  */
 function sourceHealthAuctionAll($dir = null, $file = null) {
     $a = sourceHealthAuction($dir);
     $b = sourceHealthAuctionB($file);
     $bad = array();
     $why = array();
-    if (!$a['ok']) { $bad[] = 'PB';       $why[] = 'PB: ' . $a['detail']; }
-    if (!$b['ok']) { $bad[] = 'aaajapan'; $why[] = 'aaajapan: ' . $b['detail']; }
+    if (!$a['ok']) { $bad[] = 'A'; $why[] = 'Auction A: ' . $a['detail']; }
+    if (!$b['ok']) { $bad[] = 'B'; $why[] = 'Auction B: ' . $b['detail']; }
     if (!$bad) {
-        $r = sourceState(true, 'ok', 'Both auction feeds are working. First feed: ' . $a['detail']
-                                   . ' Second feed: ' . $b['detail'], max($a['at'], $b['at']));
+        $r = sourceState(true, 'ok', 'Both auction feeds are working. Auction A: ' . $a['detail']
+                                   . ' Auction B: ' . $b['detail'], max($a['at'], $b['at']));
     } else {
-        if (count($bad) === 1) {
-            $why[] = 'The other auction feed is working.';
+        $other = count($bad) === 1 ? ($bad[0] === 'A' ? 'B' : 'A') : '';
+        if ($other !== '') {
+            $why[] = 'Auction ' . $other . ' is working.';
         }
         $r = sourceState(false, count($bad) === 2 ? 'both' : strtolower($bad[0]), implode(' ', $why),
                          $a['ok'] ? $b['at'] : $a['at']);
+        if ($other !== '') {
+            $r['text'] = 'not working · ' . $other . ' working';
+        }
     }
-    $r['name'] = $bad ? implode(' + ', $bad) . ' Auction' : 'Auction';
+    $r['name'] = $bad ? 'Auction ' . implode(' + ', $bad) : 'Auction';
     $r['a'] = $a['state'];
     $r['b'] = $b['state'];
     return $r;
