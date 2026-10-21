@@ -30,6 +30,10 @@
  *   AUCTION B   the second feed's survey (auction-survey.json): each hall once,
  *               its count against what PB already holds there (B never brings
  *               those in again) and what B holds; the rest is still to come.
+ *               A hall whose sale is over is left out: after Japan's midnight
+ *               the survey still lists yesterday's halls for hours, and counted
+ *               against today's rows they read as a whole day "pending"
+ *               (21 October 2026: "B 21,083 lots pending" for a real 6,460).
  *               (sbk-tools/bgap.py, "still to come")
  *
  * The sums run at most every five minutes and are kept in one small file. A
@@ -122,16 +126,22 @@ function sourceSyncA(mysqli $conn) {
     return array('pending' => max(0, $pb - ($offer + $listed)), 'pb' => $pb, 'offer' => $offer, 'concluded' => $listed);
 }
 
-/** Auction B: each hall of the second feed's survey once - its count, less PB's and ours there. */
-function sourceSyncB(mysqli $conn) {
+/**
+ * Auction B: each hall of the second feed's survey once - its count, less PB's and ours there.
+ * $sv / $st: a test hands in a survey and hall state of its own instead of the live files.
+ */
+function sourceSyncB(mysqli $conn, $sv = null, $st = null) {
     $dir = sourceDataDir('aaa-fetch');
-    $sv  = json_decode((string) @file_get_contents($dir . '/auction-survey.json'), true);
-    $st  = json_decode((string) @file_get_contents($dir . '/auction-halls.json'), true);
+    $sv  = $sv ?? json_decode((string) @file_get_contents($dir . '/auction-survey.json'), true);
+    $st  = $st ?? json_decode((string) @file_get_contents($dir . '/auction-halls.json'), true);
     if (!is_array($sv) || empty($sv['halls']) || !is_array($sv['halls'])) {
         return null;
     }
     $tz    = new DateTimeZone('Asia/Tokyo');
     $today = (new DateTime('now', $tz))->format('Y-m-d');
+    // A tender the survey lists under yesterday AND today is still selling, and PB may hold it
+    // under yesterday's date - so the rows are counted from yesterday on.
+    $from  = (new DateTime('now', $tz))->modify('-1 day')->format('Y-m-d');
     // The survey names a sale day by its day of the month: the nearest such date from yesterday on.
     $dateOf = function ($dom) use ($today, $tz) {
         $t = new DateTime($today . ' 12:00', $tz);
@@ -158,13 +168,13 @@ function sourceSyncB(mysqli $conn) {
     };
     $pb = array();
     $q = $conn->query("SELECT auction_on d, LOWER(TRIM(auction)) h, COUNT(*) n FROM cars
-                        WHERE auction_on >= '$today' AND source_url LIKE 'https://pacificboeki.jp%' GROUP BY d, h");
+                        WHERE auction_on >= '$from' AND source_url LIKE 'https://pacificboeki.jp%' GROUP BY d, h");
     while ($q && ($w = $q->fetch_assoc())) {
         $pb[$w['d'] . '|' . $w['h']] = (int) $w['n'];
     }
     $ours = array();
     $q = $conn->query("SELECT auction_on d, SUBSTRING_INDEX(SUBSTRING_INDEX(source_url, '?h=', -1), '#', 1) h, COUNT(*) n
-                         FROM cars WHERE auction_on >= '$today' AND source_url LIKE 'https://bid.aaajapan.com%' GROUP BY d, h");
+                         FROM cars WHERE auction_on >= '$from' AND source_url LIKE 'https://bid.aaajapan.com%' GROUP BY d, h");
     while ($q && ($w = $q->fetch_assoc())) {
         $k = $w['d'] . '|' . rawurldecode($w['h']);
         $ours[$k] = ($ours[$k] ?? 0) + (int) $w['n'];
@@ -183,6 +193,9 @@ function sourceSyncB(mysqli $conn) {
     $pending = 0;
     $onPb = 0;
     foreach ($byHall as $name => $x) {
+        if (max(array_keys($x['days'])) < $today) {
+            continue;           // its sale is over: results, not lots to come
+        }
         $aaa = max($x['days']);
         $p = 0;
         $o = 0;
