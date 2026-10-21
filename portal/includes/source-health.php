@@ -34,12 +34,12 @@
  *
  * Since 29 September 2026 the auction has a SECOND feed (spec 009): aaajapan's
  * live auction, read by the same job on GitHub with the same ID as the
- * statistics. The auction keeps ONE signal over both. The owner, the same day:
- * when both are fine it says "Auction working" as before, no name; when one is
- * not, it says which one is at fault. Since 19 October 2026 (the owner: when only
- * B is down it read as if A were too - "har jagah B not working") it says so in
- * the letters every count on the portal already uses, and says the other is fine:
- * "Auction B not working · A working". No source is named anywhere any more.
+ * statistics. The auction keeps ONE signal over both, and since 19 October 2026
+ * says which feed is at fault in the letters every count on the portal already
+ * uses. Since 21 October 2026 (the owner: "har jagah", in a professional way)
+ * every signal is one whole sentence - "Auction is working", "Statistics is not
+ * working", "Auction A is working · B is not working", "Auction A and B are not
+ * working". No source is named anywhere.
  */
 
 /** Where both feeds keep their notes - the account's home, outside every web root. */
@@ -76,12 +76,13 @@ function sourceAgo($seconds) {
 }
 
 /**
- * One feed's answer. `text` is all a person reads: "working" or "not working".
+ * One feed's answer. `text` is all a person reads after the label: "is working"
+ * or "is not working" ("Statistics is not working").
  * `state` says which case it was, for the tests and for whoever has to fix it;
  * `detail` is the hover text - in our own words, never the source's.
  */
 function sourceState($ok, $state, $detail, $at = 0) {
-    return array('ok' => $ok, 'text' => $ok ? 'working' : 'not working',
+    return array('ok' => $ok, 'text' => $ok ? 'is working' : 'is not working',
                  'state' => $state, 'detail' => $detail, 'at' => (int) $at);
 }
 
@@ -263,12 +264,12 @@ function sourceHealthAuctionB($file = null) {
 }
 
 /**
- * The auction's ONE signal over both feeds (the owner, 29 September 2026). Both
- * fine: green "Auction working". One not: red, and `name` - the label - says
- * which, in the portal's own letters (A = the first feed, B = the second, as in
- * every "A 137,198 B 9,051" count), and `text` says the other one still works:
- * "Auction B" + "not working · A working"; both down: "Auction A + B" + "not
- * working" (the owner, 19 October 2026). `state` is 'a', 'b' or 'both'; `a` and
+ * The auction's ONE signal over both feeds (the owner, 29 September 2026), in the
+ * portal's own letters (A = the first feed, B = the second, as in every
+ * "A 137,198 B 9,051" count). The label is always "Auction" and `text` finishes
+ * the sentence (the owner, 21 October 2026): both fine "is working"; one down
+ * "A is working · B is not working" or "A is not working · B is working"; both
+ * down "A and B are not working". `state` is 'ok', 'a', 'b' or 'both'; `a` and
  * `b` keep each feed's own case for the tests and whoever fixes it.
  */
 function sourceHealthAuctionAll($dir = null, $file = null) {
@@ -288,11 +289,10 @@ function sourceHealthAuctionAll($dir = null, $file = null) {
         }
         $r = sourceState(false, count($bad) === 2 ? 'both' : strtolower($bad[0]), implode(' ', $why),
                          $a['ok'] ? $b['at'] : $a['at']);
-        if ($other !== '') {
-            $r['text'] = 'not working · ' . $other . ' working';
-        }
+        $r['text'] = $other === '' ? 'A and B are not working'
+                   : ($other === 'B' ? 'A is not working · B is working' : 'A is working · B is not working');
     }
-    $r['name'] = $bad ? 'Auction ' . implode(' + ', $bad) : 'Auction';
+    $r['name'] = 'Auction';
     $r['a'] = $a['state'];
     $r['b'] = $b['state'];
     return $r;

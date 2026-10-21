@@ -21,7 +21,7 @@
       el.title = h.detail;
       var t = el.querySelector('.src-text');
       if (t) { t.textContent = h.text; }
-      // the auction's label says which feed is at fault ("Auction B" + "not working · A working")
+      // label + text are one sentence: "Auction" + "A is working · B is not working"
       var n = el.querySelector('.src-name');
       if (n && h.name) { n.textContent = h.name; }
     }

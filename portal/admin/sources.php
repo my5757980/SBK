@@ -134,15 +134,15 @@ $notesA = sourceIdNotes('a');
 $hA = sourceHealthAuction();
 $pendingA = is_file(sourceDataDir('pb-harvest') . '/session.pending');
 if ($pendingA) {
-    $sigA = array('cls' => 'is-wait', 'text' => 'Taking the new sign-in',
+    $sigA = array('cls' => 'is-wait', 'text' => 'Auction A is taking the new sign-in',
                   'detail' => 'A new sign-in is waiting; the next run takes it, within 5 minutes.');
 } elseif ($hA['ok']) {
-    $sigA = array('cls' => 'is-ok', 'text' => 'Working', 'detail' => $hA['detail']);
+    $sigA = array('cls' => 'is-ok', 'text' => 'Auction A is working', 'detail' => $hA['detail']);
 } elseif ($hA['state'] === 'signedout') {
-    $sigA = array('cls' => 'is-bad', 'text' => 'Needs a sign-in',
+    $sigA = array('cls' => 'is-bad', 'text' => 'Auction A is not working · it needs a sign-in',
                   'detail' => 'The ID is no longer signed in. Do steps 1-4 below - with the same ID, or a new one.');
 } else {
-    $sigA = array('cls' => 'is-bad', 'text' => 'Not working', 'detail' => $hA['detail']);
+    $sigA = array('cls' => 'is-bad', 'text' => 'Auction A is not working', 'detail' => $hA['detail']);
 }
 
 /* Feed B: the job's last report, and whether it has taken the saved ID yet. */
@@ -155,10 +155,13 @@ if ($waitingB) {
     $sigB = array('cls' => 'is-wait', 'text' => 'Waiting for the new ID',
                   'detail' => 'Saved ' . sourceAgo(time() - $idB['saved_at']) . '. The next run signs in with it - within about 20 minutes.');
 } elseif ($hS['ok'] && $hB['ok']) {
-    $sigB = array('cls' => 'is-ok', 'text' => 'Working', 'detail' => $hS['detail']);
+    $sigB = array('cls' => 'is-ok', 'text' => 'Auction B and Statistics are working', 'detail' => $hS['detail']);
 } else {
+    // The ID they share at fault stops both; otherwise only B's passes are failing.
     $bad = !$hS['ok'] ? $hS : $hB;
-    $sigB = array('cls' => 'is-bad', 'text' => 'Not working', 'detail' => $bad['detail']);
+    $sigB = array('cls' => 'is-bad', 'text' => !$hS['ok'] ? 'Auction B and Statistics are not working'
+                                                           : 'Auction B is not working · Statistics is working',
+                  'detail' => $bad['detail']);
 }
 if ($idB['rev'] > 0) {
     $inUseB = $waitingB ? 'The job is still on the previous ID until its next run.'
