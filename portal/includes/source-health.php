@@ -40,7 +40,14 @@
  * every signal is one whole sentence - "Auction is working", "Statistics is not
  * working", "Auction A is working · B is not working", "Auction A and B are not
  * working". No source is named anywhere.
+ *
+ * Since 21 October 2026 each sentence ends with how far its feed is behind the
+ * source, worked out from what our own feeds left on this server (the owner:
+ * "asal farq", changing by itself): "Statistics is working · 11 records pending",
+ * "Auction is working · A fully synced · B 155 lots pending". See
+ * includes/source-sync.php.
  */
+require_once __DIR__ . '/source-sync.php';
 
 /** Where both feeds keep their notes - the account's home, outside every web root. */
 function sourceHome() {
@@ -298,8 +305,56 @@ function sourceHealthAuctionAll($dir = null, $file = null) {
     return $r;
 }
 
+/** "11 records pending" / "fully synced"; '' when the number is not known - never guessed. */
+function sourcePending($n, $unit) {
+    if ($n === null) {
+        return '';
+    }
+    $n = (int) $n;
+    return $n > 0 ? number_format($n) . ' ' . $unit . ($n === 1 ? '' : 's') . ' pending' : 'fully synced';
+}
+
+/**
+ * The signals with the real difference after them. A number that could not be
+ * worked out is left out, never shown as 0. The hover says what stands behind it.
+ */
+function sourceWithSync(array $all, $sync) {
+    if (!is_array($sync)) {
+        return $all;
+    }
+    $s = (isset($sync['statistics']) && is_array($sync['statistics'])) ? $sync['statistics'] : null;
+    if ($s && isset($all['statistics'])) {
+        $all['statistics']['text'] .= ' · ' . sourcePending($s['pending'], 'record');
+        $all['statistics']['detail'] .= ' The source lists ' . number_format((int) $s['total']) . ' sales for its 93 days to '
+            . date('j M', strtotime($s['date'])) . '; the portal holds ' . number_format((int) $s['ours']) . ' of them.';
+        $all['statistics']['pending'] = (int) $s['pending'];
+    }
+    $a = (isset($sync['a']) && is_array($sync['a'])) ? $sync['a'] : null;
+    $b = (isset($sync['b']) && is_array($sync['b'])) ? $sync['b'] : null;
+    if (($a || $b) && isset($all['auction'])) {
+        $pa = $a ? sourcePending($a['pending'], 'lot') : '';
+        $pb = $b ? sourcePending($b['pending'], 'lot') : '';
+        $tail = ($pa === 'fully synced' && $pb === 'fully synced') ? 'fully synced'
+              : implode(' · ', array_filter(array($pa !== '' ? 'A ' . $pa : '', $pb !== '' ? 'B ' . $pb : '')));
+        $all['auction']['text'] .= ' · ' . $tail;
+        if ($a) {
+            $all['auction']['detail'] .= ' Auction A: ' . number_format((int) $a['concluded'])
+                . ' concluded lots are kept as records and hidden from customers.';
+            $all['auction']['pending_a'] = (int) $a['pending'];
+        }
+        if ($b) {
+            $all['auction']['detail'] .= ' Auction B: ' . ((int) $b['pending'] > 0
+                ? number_format((int) $b['pending']) . ' lots are still to come.' : 'every lot is in.');
+            $all['auction']['pending_b'] = (int) $b['pending'];
+        }
+    }
+    return $all;
+}
+
+/** Both signals with their numbers - what the API hands the pages every minute (it refreshes the sums). */
 function sourceHealthAll() {
-    return array('auction' => sourceHealthAuctionAll(), 'statistics' => sourceHealthStatistics());
+    return sourceWithSync(array('auction' => sourceHealthAuctionAll(), 'statistics' => sourceHealthStatistics()),
+                          sourceSync(true));
 }
 
 /**
@@ -311,6 +366,12 @@ function sourceSignal($which, $extraClass = '') {
         return '';
     }
     $h = ($which === 'statistics') ? sourceHealthStatistics() : sourceHealthAuctionAll();
+    // The page only reads the kept numbers (no sums while it renders); older than half an hour they wait
+    // for source-signal.js, which asks the API - and the API refreshes them - within a minute.
+    $sync = sourceSync(false);
+    if (is_array($sync) && time() - (int) ($sync['at'] ?? 0) <= 1800) {
+        $h = sourceWithSync(array($which => $h), $sync)[$which];
+    }
     $name  = ($which === 'statistics') ? 'Statistics' : $h['name'];
     $class = $h['ok'] ? 'is-ok' : 'is-bad';
     return '<span class="src-sig ' . $class . ($extraClass !== '' ? ' ' . $extraClass : '') . '" data-src="'

@@ -163,6 +163,24 @@ if ($waitingB) {
                                                            : 'Auction B is not working · Statistics is working',
                   'detail' => $bad['detail']);
 }
+/* Each card's sentence ends with how far its feed is behind (the owner, 21 October 2026) - the same
+   numbers as the signals, includes/source-sync.php. A card waiting for a new sign-in or ID says only that. */
+$sync = sourceSync(true);
+if (is_array($sync)) {
+    if ($sigA['cls'] !== 'is-wait' && !empty($sync['a'])) {
+        $sigA['text'] .= ' · ' . sourcePending($sync['a']['pending'], 'lot');
+    }
+    $tailB = array();
+    if (!empty($sync['b'])) {
+        $tailB[] = 'B ' . sourcePending($sync['b']['pending'], 'lot');
+    }
+    if (!empty($sync['statistics'])) {
+        $tailB[] = 'Statistics ' . sourcePending($sync['statistics']['pending'], 'record');
+    }
+    if ($sigB['cls'] !== 'is-wait' && $tailB) {
+        $sigB['text'] .= ' · ' . implode(' · ', $tailB);
+    }
+}
 if ($idB['rev'] > 0) {
     $inUseB = $waitingB ? 'The job is still on the previous ID until its next run.'
                         : 'In use: the ID saved ' . date('j M, H:i', $idB['saved_at']) . ($idB['saved_by'] ? ' by ' . $idB['saved_by'] : '') . '.';
