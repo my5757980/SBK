@@ -143,12 +143,42 @@ const STAT_UNSOLD_SQL = "(result LIKE 'not sold%' OR result LIKE 'no se vend%')"
    1,212,906) while it was still about 1.1 lakh short INSIDE the window. Every
    figure and list a person sees now comes from the same window; older rows stay
    in the table, out of sight. The fetcher's counts (aaa-stats-ingest.php ?have=)
-   are not windowed - it always names its own dates. */
+   are not windowed - it always names its own dates.
+
+   WHEN the window moves (21 October 2026): the source's 93 days end on its newest
+   published day, so it drops its oldest day when it publishes the next one, in
+   Japan's early morning (~21:00 UTC). Ours moved at Japan's midnight, about six
+   hours earlier, so from 20:00 to ~02:00 in Pakistan every figure here was one old
+   day (~5,500 sales) under the source's. Now ours ends on the newest sale day we
+   hold - the source's own newest day once the fetcher has it. */
 const STAT_WINDOW_DAYS = 93;
+
+/**
+ * The window's first day: STAT_WINDOW_DAYS sale days ending on the newest day in
+ * the table. Held between the day before yesterday and yesterday (Japan): today's
+ * sales have no results yet, and a fetcher that stops must not freeze the window.
+ * Once per request - MAX(sold_on) is read off its index.
+ */
+function stWindowFrom() {
+    static $from = null;
+    if ($from !== null) {
+        return $from;
+    }
+    $tz = new DateTimeZone('Asia/Tokyo');
+    $hi = (new DateTime('now', $tz))->modify('-1 day')->format('Y-m-d');
+    $lo = (new DateTime('now', $tz))->modify('-2 day')->format('Y-m-d');
+    $newest = '';
+    $conn = $GLOBALS['conn'] ?? null;
+    if ($conn instanceof mysqli && ($q = @$conn->query('SELECT MAX(sold_on) FROM car_stats'))) {
+        $newest = (string) ($q->fetch_row()[0] ?? '');
+    }
+    $end = max($lo, min($hi, $newest !== '' ? $newest : $hi));
+    return $from = (new DateTime($end, $tz))->modify('-' . (STAT_WINDOW_DAYS - 1) . ' day')->format('Y-m-d');
+}
 
 /** The window as a condition: the sale day, by Japan's calendar. sold_on is indexed. */
 function stWindowSql($col = 'sold_on') {
-    return $col . ' >= DATE_SUB(DATE(UTC_TIMESTAMP() + INTERVAL 9 HOUR), INTERVAL ' . (int) STAT_WINDOW_DAYS . ' DAY)';
+    return $col . " >= '" . stWindowFrom() . "'";
 }
 
 /* ------------------------------------------------ the source's ADVANCED SEARCH
