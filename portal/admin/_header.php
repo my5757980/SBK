@@ -89,15 +89,13 @@ $nav_self = basename((string) ($_SERVER['SCRIPT_NAME'] ?? ''));
 global $conn;
 $nav_badge = array();
 if (staffCan('bids.view')) {
-    // The same narrowing the Bids screen uses. A count is information too: a
-    // person who may not see other people's bids may not be told how many
-    // there are - see bidScopeStaffId().
-    $bidScope = bidScopeStaffId();
-    $r = ($bidScope === null)
-        ? $conn->query("SELECT COUNT(*) c FROM bids WHERE status = 'placed'")
-        : $conn->query("SELECT COUNT(*) c FROM bids WHERE status = 'placed'
-                          AND staff_id = " . (int) $bidScope);
-    $nav_badge['bids'] = $r ? (int) $r->fetch_row()[0] : 0;
+    // The number the Bids screen opens on: today's bids, every status - its
+    // "All" chip (the owner, 29 October 2026). It used to count every day's
+    // bids still waiting, so with 11 bids today and 11 old ones never answered
+    // it read 22 beside an "All (11)". Same call, same day, same narrowing as
+    // the screen - a person who may not see other people's bids may not be told
+    // how many there are (bidScopeStaffId()).
+    $nav_badge['bids'] = count(getAllBids('', bidScopeStaffId(), bidDay('')));
 }
 if (staffCan('enquiries.view')) {
     $r = $conn->query("SELECT COUNT(*) c FROM inquiries WHERE status = 'new'");
