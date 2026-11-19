@@ -126,6 +126,18 @@ export async function send(token, { to = 0, thread = 0, group = 0, body: text })
   return body;
 }
 
+/* Delete one of YOUR OWN messages ("delete for everyone"). The server wipes the
+   text + media and the other side turns the bubble into a placeholder on its
+   next poll (api/delete.php). */
+export async function del(token, id) {
+  const { body } = await call(CHAT + '/api/delete.php', {
+    method: 'POST',
+    headers: authed(token),
+    body: form({ id }),
+  });
+  return body;
+}
+
 /**
  * A picture or a voice note, sent exactly the way the browser's own upload.php
  * expects it - multipart, `kind` telling it which, `secs` only for a voice

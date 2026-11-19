@@ -163,6 +163,12 @@ function bubble(m) {
   row.className = 'msg' + (m.mine ? ' me' : '');
   row.dataset.id = m.id;
 
+  if (m.deleted) {
+    row.innerHTML = delBubbleHtml(clockOf(m.at));
+    scroll.appendChild(row);
+    return;
+  }
+
   var inner = '';
   if (m.kind === 'call') {
     row.innerHTML = callLogHtml(m);
@@ -185,7 +191,7 @@ function bubble(m) {
   }
 
   row.innerHTML = '<div class="bub">' + inner
-    + '<div class="foot"><span>' + esc(clockOf(m.at)) + '</span>' + ticks(m) + '</div></div>';
+    + '<div class="foot"><span>' + esc(clockOf(m.at)) + '</span>' + ticks(m) + delBtnHtml(m) + '</div></div>';
   scroll.appendChild(row);
 }
 
@@ -208,6 +214,44 @@ function refreshTicks(list) {
                             delivered: (m.d !== undefined ? m.d : m.delivered),
                             read:      (m.r !== undefined ? m.r : m.read) });
   }
+}
+
+/* ------------------------------------------------------- delete a message
+   "Delete for everyone", like WhatsApp: the sender removes their own line and
+   on both screens it becomes a small "this message was deleted" placeholder.
+   There is no time limit. */
+function delBubbleHtml(timeText) {
+  return '<div class="bub bub-del"><p class="del" style="opacity:.6;font-style:italic">'
+       + '\uD83D\uDEAB This message was deleted</p>'
+       + '<div class="foot"><span>' + esc(timeText || '') + '</span></div></div>';
+}
+
+/* A tiny "Delete" only on your OWN live bubbles. Styled inline so it needs no
+   change to the stylesheet. */
+function delBtnHtml(m) {
+  if (!m.mine) { return ''; }
+  return '<button type="button" class="msgdel" title="Delete this message"'
+       + ' style="margin-left:8px;border:0;background:transparent;color:inherit;'
+       + 'opacity:.5;cursor:pointer;font-size:11px;padding:0;font-family:inherit">Delete</button>';
+}
+
+/* Turn an already-drawn bubble into the placeholder, keeping its time. Fed by
+   the `deletions` list from every poll (the message itself is never re-sent, so
+   a delete reaches an old bubble the same way a tick does). */
+function markDeleted(id) {
+  var row = scroll.querySelector('.msg[data-id="' + id + '"]');
+  if (!row) { return; }
+  var t = row.querySelector('.foot span');
+  row.innerHTML = delBubbleHtml(t ? t.textContent : '');
+}
+function applyDeletions(ids) {
+  for (var i = 0; i < ids.length; i++) { markDeleted(ids[i]); }
+}
+function deleteMsg(id) {
+  if (!id || !window.confirm('Delete this message for everyone?')) { return; }
+  post('api/delete.php', 'id=' + encodeURIComponent(id), function () {
+    markDeleted(id);
+  }, function (msg) { alert(msg || 'Could not delete.'); });
 }
 
 function clearPane(msg, sub) {
@@ -571,6 +615,7 @@ function tick(force) {
     }
     // ticks that moved
     if (j.receipts) { refreshTicks(j.receipts); }
+    if (j.deletions) { applyDeletions(j.deletions); }
 
     // the side
     if (isGuest && j.people) { drawPeople(j.people, j.threads || {}); syncHead(j.people, null); }
@@ -913,6 +958,14 @@ function send() {
 }
 
 sendBtn.addEventListener('click', send);
+/* The little "Delete" on own bubbles (delegated, so it works for bubbles drawn
+   later too). */
+scroll.addEventListener('click', function (ev) {
+  var b = ev.target.closest ? ev.target.closest('.msgdel') : null;
+  if (!b) { return; }
+  var row = b.closest('.msg');
+  if (row) { deleteMsg(parseInt(row.dataset.id, 10) || 0); }
+});
 box.addEventListener('keydown', function (ev) {
   // Enter sends; Shift+Enter is a new line — the habit every messenger built.
   if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); send(); }

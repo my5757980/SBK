@@ -968,18 +968,20 @@ function callOut(array $call, $viewerIsGuest) {
 
 /** One message, shaped for the browser. */
 function messageOut($m, $viewerIsGuest) {
+    $deleted = !empty($m['deleted_at']);
     return array(
         'id'        => (int) $m['id'],
         'thread'    => (int) $m['thread_id'],
         'mine'      => ($viewerIsGuest === ((int) $m['from_guest'] === 1)),
-        'kind'      => $m['kind'],
-        'body'      => (string) $m['body'],
-        'media'     => $m['media_path'] ? ('media.php?m=' . (int) $m['id']) : null,
-        'mime'      => $m['media_mime'],
-        'secs'      => $m['media_secs'] !== null ? (int) $m['media_secs'] : null,
+        'kind'      => $deleted ? 'text' : $m['kind'],
+        'body'      => $deleted ? '' : (string) $m['body'],
+        'media'     => (!$deleted && $m['media_path']) ? ('media.php?m=' . (int) $m['id']) : null,
+        'mime'      => $deleted ? null : $m['media_mime'],
+        'secs'      => (!$deleted && $m['media_secs'] !== null) ? (int) $m['media_secs'] : null,
         'at'        => $m['created_at'],
         'delivered' => !empty($m['delivered_at']),
         'read'      => !empty($m['read_at']),
+        'deleted'   => $deleted,
     );
 }
 
@@ -1027,6 +1029,134 @@ function markRead($threadId, $viewerIsGuest) {
     $st->bind_param('i', $threadId);
     $st->execute();
     $st->close();
+}
+
+/**
+ * A person deletes their OWN message ("delete for everyone", like WhatsApp).
+ *
+ * The row is kept - with its text and media wiped and the media file removed -
+ * so the other side, who already drew the bubble, can turn it into a "deleted"
+ * placeholder on its next poll (see deletionsSince / poll.php). Only the sender
+ * may delete, and only inside a conversation or room they belong to. There is
+ * no time limit: a person may delete their own message at any time.
+ *
+ * @return int|null  the message id on success, null if it is not theirs.
+ */
+function deleteMessage($id, $viewerIsGuest, $meId) {
+    $id = (int) $id;
+    $st = db()->prepare("SELECT id, thread_id, group_id, from_guest, staff_id, media_path, deleted_at
+                           FROM chat_messages WHERE id = ? LIMIT 1");
+    $st->bind_param('i', $id);
+    $st->execute();
+    $m = $st->get_result()->fetch_assoc();
+    $st->close();
+    if (!$m) {
+        return null;
+    }
+
+    $groupId = (int) $m['group_id'];
+    if ($groupId > 0) {
+        // A group message: only its staff author, still a member, may delete it.
+        if ($viewerIsGuest || (int) $m['staff_id'] !== (int) $meId || !mayReadGroup($groupId)) {
+            return null;
+        }
+    } else {
+        // A one-to-one message: the caller must own the conversation AND be the
+        // side that wrote it (a staff admin who can see every thread can still
+        // only delete the lines they wrote themselves).
+        if (!mayReadThread((int) $m['thread_id'])) {
+            return null;
+        }
+        $fromGuest = ((int) $m['from_guest'] === 1);
+        if ($fromGuest !== (bool) $viewerIsGuest) {
+            return null;
+        }
+        if (!$viewerIsGuest && (int) $m['staff_id'] !== (int) $meId) {
+            return null;
+        }
+    }
+
+    if (!empty($m['deleted_at'])) {
+        return $id;                      // already gone - idempotent
+    }
+
+    // Remove the media file (one file per message, no thumbnails in this chat).
+    if (!empty($m['media_path'])) {
+        $root = realpath(MEDIA_DIR);
+        $real = realpath(MEDIA_DIR . '/' . $m['media_path']);
+        if ($real && $root && strpos($real, $root) === 0) {
+            @unlink($real);
+        }
+    }
+
+    $st = db()->prepare("UPDATE chat_messages
+                            SET deleted_at = NOW(), body = '', media_path = NULL,
+                                media_mime = NULL, media_bytes = NULL, media_secs = NULL
+                          WHERE id = ?");
+    $st->bind_param('i', $id);
+    $st->execute();
+    $st->close();
+
+    // If this was the newest line, stop the side-list preview showing it.
+    $preview = "\xF0\x9F\x9A\xAB This message was deleted";
+    if ($groupId > 0) {
+        $top = (int) db()->query("SELECT COALESCE(MAX(id),0) FROM chat_messages WHERE group_id = " . $groupId)->fetch_row()[0];
+        if ($top === $id) {
+            $st = db()->prepare("UPDATE chat_groups SET last_preview = ? WHERE id = ?");
+            $st->bind_param('si', $preview, $groupId);
+            $st->execute();
+            $st->close();
+        }
+    } else {
+        $tid = (int) $m['thread_id'];
+        $top = (int) db()->query("SELECT COALESCE(MAX(id),0) FROM chat_messages WHERE thread_id = " . $tid)->fetch_row()[0];
+        if ($top === $id) {
+            $st = db()->prepare("UPDATE chat_threads SET last_preview = ? WHERE id = ?");
+            $st->bind_param('si', $preview, $tid);
+            $st->execute();
+            $st->close();
+        }
+    }
+    return $id;
+}
+
+/**
+ * The ids of deleted messages in a thread, newest first.
+ *
+ * `messagesSince` only returns rows newer than `after`, so a bubble already on
+ * the screen is never re-sent - and a delete would never reach it. This is the
+ * same answer as the receipts list: a small set returned on every poll so the
+ * screen can blank any bubble it still shows as live.
+ */
+function deletionsSince($threadId, $limit = 100) {
+    $out = array();
+    $st = db()->prepare("SELECT id FROM chat_messages
+                          WHERE thread_id = ? AND deleted_at IS NOT NULL
+                       ORDER BY id DESC LIMIT " . (int) $limit);
+    $st->bind_param('i', $threadId);
+    $st->execute();
+    $r = $st->get_result();
+    while ($row = $r->fetch_row()) {
+        $out[] = (int) $row[0];
+    }
+    $st->close();
+    return $out;
+}
+
+/** The ids of deleted messages in a group, newest first (see deletionsSince). */
+function groupDeletions($groupId, $limit = 100) {
+    $out = array();
+    $st = db()->prepare("SELECT id FROM chat_messages
+                          WHERE group_id = ? AND deleted_at IS NOT NULL
+                       ORDER BY id DESC LIMIT " . (int) $limit);
+    $st->bind_param('i', $groupId);
+    $st->execute();
+    $r = $st->get_result();
+    while ($row = $r->fetch_row()) {
+        $out[] = (int) $row[0];
+    }
+    $st->close();
+    return $out;
 }
 
 /**
@@ -1418,21 +1548,23 @@ function addGroupMessage($groupId, $staffId, $kind, $body,
 function groupMessageOut($m, $meId, array $names) {
     $from = (int) $m['staff_id'];
     $name = (string) (isset($names[$from]) ? $names[$from] : 'Someone');
+    $deleted = !empty($m['deleted_at']);
     return array(
         'id'        => (int) $m['id'],
         'group'     => (int) $m['group_id'],
         'mine'      => ($from === (int) $meId),
-        'kind'      => $m['kind'],
-        'body'      => (string) $m['body'],
-        'media'     => $m['media_path'] ? ('media.php?m=' . (int) $m['id']) : null,
-        'mime'      => $m['media_mime'],
-        'secs'      => $m['media_secs'] !== null ? (int) $m['media_secs'] : null,
+        'kind'      => $deleted ? 'text' : $m['kind'],
+        'body'      => $deleted ? '' : (string) $m['body'],
+        'media'     => (!$deleted && $m['media_path']) ? ('media.php?m=' . (int) $m['id']) : null,
+        'mime'      => $deleted ? null : $m['media_mime'],
+        'secs'      => (!$deleted && $m['media_secs'] !== null) ? (int) $m['media_secs'] : null,
         'at'        => $m['created_at'],
         'who'       => $name,
         'hue'       => avatarHue($from . $name),
         'ini'       => initials($name),
         'delivered' => true,
         'read'      => false,
+        'deleted'   => $deleted,
     );
 }
 

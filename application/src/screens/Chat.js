@@ -9,7 +9,7 @@ import Avatar from '../Avatar';
 import { C, clockOf } from '../theme';
 import { useUI, type, page, TOUCH, lift } from '../ui';
 import { Empty, Waiting, Notice } from '../bits';
-import { poll, send, mediaUrl, reportProblem } from '../api';
+import { poll, send, del, mediaUrl, reportProblem } from '../api';
 import VoiceBubble from '../VoiceBubble';
 import { useCallEngine, useCallSnap } from '../calls';
 import { dur } from '../callEngine';
@@ -179,6 +179,21 @@ export default function Chat({ token, target, onBack }) {
           return touched ? next : old;
         });
       }
+      /* A message the sender deleted: the list comes back on every poll (like
+         the receipts), so a bubble already drawn becomes the placeholder. */
+      if (j.deletions && j.deletions.length) {
+        setMsgs((old) => {
+          const gone = {};
+          for (const id of j.deletions) gone[id] = 1;
+          let touched = false;
+          const next = old.map((m) => {
+            if (!gone[m.id] || m.deleted) return m;
+            touched = true;
+            return { ...m, deleted: true, body: '', media: null, kind: 'text' };
+          });
+          return touched ? next : old;
+        });
+      }
       misses.current = 0;
       setErr('');
     } catch (e) {
@@ -343,6 +358,30 @@ export default function Chat({ token, target, onBack }) {
     () => msgs.filter((m) => m.kind === 'image' && m.media).map((m) => ({ id: m.id, uri: mediaUrl(token, m.id) })),
     [msgs, token],
   );
+  function markDeletedLocal(id) {
+    setMsgs((old) => old.map((m) => (m.id === id
+      ? { ...m, deleted: true, body: '', media: null, kind: 'text' } : m)));
+  }
+
+  /* Long-press your own bubble to delete it for everyone. No time limit. */
+  function askDelete(m) {
+    if (!m || !m.mine || m.deleted) return;
+    Alert.alert('Delete message', 'Delete this message for everyone?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            const r = await del(token, m.id);
+            if (r && r.ok) markDeletedLocal(m.id);
+            else Alert.alert('Could not delete', (r && r.error) || 'Please try again.');
+          } catch (e) {
+            Alert.alert('Could not delete', 'Please try again.');
+          }
+        },
+      },
+    ]);
+  }
+
   function openPicture(id) {
     const k = shots.findIndex((p) => p.id === id);
     if (k >= 0) setViewAt(k);
@@ -571,7 +610,10 @@ export default function Chat({ token, target, onBack }) {
             const mine = !!m.mine;
             return (
               <View style={[s.row, mine && { justifyContent: 'flex-end' }, { marginBottom: ui.s(8) }]}>
-                <View
+                <TouchableOpacity
+                  activeOpacity={1}
+                  delayLongPress={350}
+                  onLongPress={mine && !m.deleted ? () => askDelete(m) : undefined}
                   style={[
                     {
                       maxWidth: '84%',
@@ -649,6 +691,13 @@ export default function Chat({ token, target, onBack }) {
                     </TouchableOpacity>
                   ) : m.kind === 'voice' && m.media ? (
                     <VoiceBubble uri={mediaUrl(token, m.id)} mine={mine} knownSecs={m.secs} />
+                  ) : m.deleted ? (
+                    <Text
+                      maxFontSizeMultiplier={ui.maxFont}
+                      style={[type('body', ui), { fontStyle: 'italic', color: mine ? '#C9D5E6' : C.ink3 }]}
+                    >
+                      {'\uD83D\uDEAB This message was deleted'}
+                    </Text>
                   ) : (
                     <LinkText
                       text={m.body}
@@ -673,7 +722,7 @@ export default function Chat({ token, target, onBack }) {
                       />
                     ) : null}
                   </View>
-                </View>
+                </TouchableOpacity>
               </View>
             );
           }}

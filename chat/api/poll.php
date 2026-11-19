@@ -73,6 +73,7 @@ if ($groupId > 0 && !$viewerIsGuest) {
         markGroupRead($groupId, (int) $s['id']);
     }
     $out['receipts'] = groupReceipts($groupId, (int) $s['id']);
+    $out['deletions'] = groupDeletions($groupId);
 }
 
 /* ---- the thread that is open, if one is */
@@ -117,6 +118,7 @@ if ($threadId > 0 && $groupId <= 0) {
     }
     $st->close();
     $out['receipts'] = $rc;
+    $out['deletions'] = deletionsSince($threadId);
 }
 
 /* ---- the side list */
