@@ -1,0 +1,61 @@
+name: Build SBK app APK
+
+# Builds the SBK Chat app (application/) into a signed-with-debug-key release APK
+# on GitHub's runners (the 4 GB build laptop cannot). Re-run by editing this file
+# (the path filter below) or from the Actions tab (workflow_dispatch).
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/build-sbk-apk.yml']
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        working-directory: application
+        run: npm install --no-audit --no-fund
+
+      - name: Expo prebuild (android)
+        working-directory: application
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build release APK
+        working-directory: application/android
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease \
+            -x lintVitalRelease -x lintVitalReportRelease -x lintVitalAnalyzeRelease
+
+      - name: Collect APK
+        run: cp application/android/app/build/outputs/apk/release/app-release.apk SBK-Chat.apk
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SBK-Chat-apk
+          path: SBK-Chat.apk
+
+      - name: Publish to a Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: sbk-app-v1.0.11
+          name: SBK Chat app v1.0.11
+          files: SBK-Chat.apk
