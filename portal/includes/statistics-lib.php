@@ -329,6 +329,37 @@ function stLetGo() {
     }
 }
 
+/**
+ * One maker's models inside the window, A to Z, each with its count - what the
+ * model box offers once a maker is chosen (the owner, 21 November 2026: pick the
+ * maker and its models come by themselves, as on the source, instead of typing
+ * the name). Kept ten minutes per maker, like the makers' own list.
+ *
+ * @return array list of array('model' => string, 'n' => int)
+ */
+function stModelsOf($conn, $maker) {
+    $maker = trim((string) $maker);
+    if ($maker === '') {
+        return array();
+    }
+    return stCached('models-w-' . md5(strtoupper($maker)), 600, function () use ($conn, $maker) {
+        $out = array();
+        $q = @$conn->prepare("SELECT model, COUNT(*) n FROM car_stats
+                               WHERE maker = ? AND model <> '' AND " . stWindowSql() . "
+                               GROUP BY model ORDER BY model ASC");
+        if ($q) {
+            $q->bind_param('s', $maker);
+            $q->execute();
+            $res = $q->get_result();
+            while ($res && $w = $res->fetch_assoc()) {
+                $out[] = array('model' => (string) $w['model'], 'n' => (int) $w['n']);
+            }
+            $q->close();
+        }
+        return $out;
+    }, 7 * 86400);
+}
+
 /** Transmission, equipment and colour, most common first, with their counts. */
 function stFacets($conn) {
     return stCached('facets-w', 3600, function () use ($conn) {

@@ -154,7 +154,23 @@ $types  = '';
 
 if ($maker !== '') { $where[] = 'maker = ?';   $params[] = $maker; $types .= 's'; }
 if ($hall  !== '') { $where[] = 'auction = ?'; $params[] = $hall;  $types .= 's'; }
-if ($model !== '') {
+/* A model picked from the maker's own list (21 November 2026) is that model and no
+   other - "PRIUS", not "PRIUS ALPHA" too - so the result is the count the list
+   showed beside it. Anything else (an older link, a name typed without a maker)
+   is read as before. */
+$modelExact = false;
+if ($model !== '' && $maker !== '' && $haveTable) {
+    foreach (stModelsOf($conn, $maker) as $mm) {
+        if (strcasecmp($mm['model'], $model) === 0) {
+            $modelExact = true;
+            $model = $mm['model'];
+            break;
+        }
+    }
+}
+if ($model !== '' && $modelExact) {
+    $where[] = 'model = ?'; $params[] = $model; $types .= 's';
+} elseif ($model !== '') {
     // The model's NAME - "prius", "Prius Alpha" - and a buyer who types the maker
     // with it ("toyota prius") is still understood.
     $where[]  = "CONCAT(maker, ' ', model) LIKE ?";
@@ -363,6 +379,15 @@ if (isset($_GET['ids'])) {
     echo json_encode(array('ids' => $ids, 'page' => $pg));
     exit;
 }
+/* The model box asks this when the maker changes: that maker's models, A to Z,
+   with their counts (stModelsOf). */
+if (isset($_GET['models'])) {
+    if (function_exists('session_write_close')) { session_write_close(); }
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-store');
+    echo json_encode($haveTable ? stModelsOf($conn, $maker) : array());
+    exit;
+}
 if (isset($_GET['count'])) {
     if (function_exists('session_write_close')) { session_write_close(); }
     header('Content-Type: application/json; charset=utf-8');
@@ -563,7 +588,7 @@ require_once 'includes/header.php';
   </div>
 
   <form method="GET" class="admin-toolbar pb-stats-form">
-    <select name="maker" class="select">
+    <select name="maker" class="select" id="stMaker">
       <option value="">All makers</option>
       <?php foreach ($makers as $m): ?>
         <option value="<?php echo sanitize($m['maker']); ?>"
@@ -572,8 +597,23 @@ require_once 'includes/header.php';
         </option>
       <?php endforeach; ?>
     </select>
-    <input type="text" name="model" class="input" placeholder="model name (e.g. Prius)"
-           value="<?php echo sanitize($model); ?>" style="min-width:150px">
+    <?php /* The maker's own models, filled in the moment a maker is chosen (the
+             script at the end of the page) - no typing. A model from an older
+             link that is not in the list stays chosen so its filter still shows. */
+          $modelList = ($maker !== '' && $haveTable) ? stModelsOf($conn, $maker) : array();
+          $modelSeen = false; ?>
+    <select name="model" class="select" id="stModel" style="min-width:150px">
+      <option value=""><?php echo $maker !== '' ? 'All models' : 'All models (pick a maker)'; ?></option>
+      <?php foreach ($modelList as $mm): $sel = $model !== '' && strcasecmp($mm['model'], $model) === 0;
+            $modelSeen = $modelSeen || $sel; ?>
+        <option value="<?php echo sanitize($mm['model']); ?>" <?php echo $sel ? 'selected' : ''; ?>>
+          <?php echo sanitize($mm['model']) . ' (' . number_format($mm['n']) . ')'; ?>
+        </option>
+      <?php endforeach; ?>
+      <?php if ($model !== '' && !$modelSeen): ?>
+        <option value="<?php echo sanitize($model); ?>" selected><?php echo sanitize($model); ?></option>
+      <?php endif; ?>
+    </select>
     <input type="text" name="chassis" class="input" placeholder="chassis no. / model code"
            value="<?php echo sanitize($chas); ?>" style="min-width:130px">
     <?php // The halls moved into the advanced search, grouped by weekday and
@@ -949,6 +989,39 @@ require_once 'includes/header.php';
     tick();
     setInterval(function () { if (!document.hidden) { tick(); } }, EVERY);
   }, EVERY - (Date.now() % EVERY));
+})();
+</script>
+
+<?php // Choose a maker and its models fill the model box at once (21 Nov 2026),
+      // from statistics.php?models=1 - the same list the page draws on a reload. ?>
+<script>
+(function () {
+  var mk = document.getElementById('stMaker'), md = document.getElementById('stModel');
+  if (!mk || !md || !window.fetch) { return; }
+  mk.addEventListener('change', function () {
+    var maker = mk.value;
+    md.innerHTML = '';
+    var first = document.createElement('option');
+    first.value = '';
+    first.textContent = maker ? 'Loading models…' : 'All models (pick a maker)';
+    md.appendChild(first);
+    if (!maker) { return; }
+    md.disabled = true;
+    fetch('statistics.php?models=1&maker=' + encodeURIComponent(maker), { credentials: 'same-origin' })
+      .then(function (r) { return r.ok ? r.json() : []; })
+      .then(function (list) {
+        if (mk.value !== maker) { return; }          // a newer choice took over
+        first.textContent = 'All models';
+        (list || []).forEach(function (m) {
+          var o = document.createElement('option');
+          o.value = m.model;
+          o.textContent = m.model + ' (' + Number(m.n).toLocaleString('en-US') + ')';
+          md.appendChild(o);
+        });
+      })
+      .catch(function () { first.textContent = 'All models'; })
+      .then(function () { md.disabled = false; });
+  });
 })();
 </script>
 
